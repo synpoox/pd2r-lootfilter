@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { buildCatalog, LEVELS, THEMES } from '../catalog.js';
-import { compile, presetTier, evaluate } from '../compile.js';
+import { compile, presetTier, evaluate, labelName, labelProblem } from '../compile.js';
 
 const data = JSON.parse(readFileSync(new URL('../data/pd2r-items.json', import.meta.url), 'utf8'));
 const catalog = buildCatalog(data);
@@ -33,6 +33,7 @@ function validate(filter) {
     assert(keys.length === 1 && (keys[0] === 'show' || keys[0] === 'hide'), 'rule must be show or hide');
     const block = r[keys[0]];
     for (const k of Object.keys(block)) assert(BLOCK.has(k), `bad block key ${k}`);
+    if ('name' in block) assert.equal(labelName(block.name), block.name, `${block.ruleName}: name Pyre would refuse`);
     for (const [k, v] of Object.entries(block.conditions)) {
       assert(CONDITIONS.has(k), `bad condition ${k}`);
       if (Array.isArray(v)) assert(v.length >= 1 && v.length <= 64, `${block.ruleName}: ${k} has ${v.length} values`);
@@ -120,6 +121,18 @@ assert.equal(sim(compile(catalog, { ...base, level: 1, itemOverrides: { r30: 'HI
 const stacked = compile(catalog, { ...base, level: 1, rarityEdits: { crafted: { N: { border: '#00ff00' } } }, rowLooks: { 'rare-jewelry': { sound: 'Filter03' } } });
 validate(stacked);
 assert.deepEqual(ring(stacked).map(r => [r.show.conditions.rarity, r.show.tooltip.borderColor === 'RGBA(0, 255, 0, 1)', r.show.dropSound]), [['rare', false, 'Filter03'], ['crafted', true, 'Filter03']], 'own look sits on top of each rarity');
+
+// Own label text: row names reach every item, an item's own name wins, and names Pyre refuses never reach the file.
+const named = compile(catalog, { ...base, level: 1, rowLooks: { 'runes-high': { name: 'HIGH RUNE' } }, itemLooks: { r30: { name: 'BER\n!!!' } } });
+validate(named);
+assert.equal(sim(named, { code: 'r31', rarity: 'normal' }).rule.name, 'HIGH RUNE');
+assert.equal(sim(named, { code: 'r30', rarity: 'normal' }).rule.name, 'BER\n!!!');
+assert.equal(sim(compile(catalog, { ...base, level: 1, rowLooks: { 'runes-high': { name: 'Bér' } } }), { code: 'r31', rarity: 'normal' }).rule.name, undefined);
+assert.equal(labelProblem('a\n\nb'), 'Remove the empty line.');
+assert.equal(labelProblem('1\n2\n3\n4'), 'Use at most 3 lines.');
+assert.equal(labelProblem('x'.repeat(56)), 'Keep each line to 55 characters.');
+assert.equal(labelProblem('x'.repeat(50) + '\n' + 'y'.repeat(40)), 'Keep the whole label to 79 characters.');
+assert.equal(labelName('  Ber  \r\n  rune '), 'Ber\nrune');
 
 // Worst case the app allows (200 picks, 3300 kept rules, every rarity and every item looked) stays under Pyre's 4096 rules.
 const allKinds = Object.fromEntries(['unique', 'set', 'rare', 'crafted', 'magic', 'base'].map(k => [k, Object.fromEntries(['S', 'A', 'N', 'B', 'SHOW'].map(t => [t, { sound: 'Filter01' }]))]));

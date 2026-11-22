@@ -1,6 +1,11 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "lootfilter", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8766"], "port": 8766 }
+    {
+      "name": "lootfilter",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-c", "import http.server as h; H = h.SimpleHTTPRequestHandler; H.extensions_map.update({'.js': 'text/javascript', '.mjs': 'text/javascript', '.flac': 'audio/flac'}); h.ThreadingHTTPServer(('127.0.0.1', 8766), H).serve_forever()"],
+      "port": 8766
+    }
   ]
 }

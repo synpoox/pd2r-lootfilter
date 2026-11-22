@@ -320,3 +320,11 @@ pre{max-height:360px;overflow:auto;font-size:12px;background:#000;border:1px sol
   .look-btn{min-height:44px}
   .entry-look .inline-head .link-btn{min-height:44px}
 }
+
+/* Own label text */
+.drop.named{white-space:pre-line;text-align:center}
+.name-ctl{margin-top:12px;max-width:520px}
+.name-ctl textarea{width:100%;min-height:52px;padding:6px 8px;font:700 14px/1.3 "Palatino Linotype",Palatino,Georgia,serif;color:var(--text);background:var(--panel-2);border:1px solid var(--line);resize:vertical}
+.name-ctl textarea[aria-invalid]{border-color:var(--t-S)}
+.name-help{color:var(--soft);font-size:13px}
+.name-help.bad{color:var(--text)}

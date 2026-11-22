@@ -68,6 +68,21 @@ export function effectiveStyles(state, kind) {
   return out;
 }
 
+// Pyre's own label text: 1 to 3 lines of 1 to 55 plain ASCII characters, 79 at most in all.
+// One bad name makes Pyre refuse the whole file, so anything else is reported and never written.
+export function labelProblem(v) {
+  const text = String(v ?? '').replace(/\r/g, '').trim();
+  if (!text) return '';
+  const lines = text.split('\n').map(l => l.trim());
+  if (lines.length > 3) return 'Use at most 3 lines.';
+  if (lines.some(l => !l)) return 'Remove the empty line.';
+  if (lines.some(l => !/^[\x20-\x7e]+$/.test(l))) return 'Use plain English letters, numbers and symbols only (no accents or emoji).';
+  if (lines.some(l => l.length > 55)) return 'Keep each line to 55 characters.';
+  if (lines.join('\n').length > 79) return 'Keep the whole label to 79 characters.';
+  return '';
+}
+export const labelName = v => (labelProblem(v) ? '' : String(v ?? '').replace(/\r/g, '').trim().split('\n').map(l => l.trim()).join('\n'));
+
 export function rgba(hex, alpha = 1) {
   const n = parseInt(hex.slice(1), 16);
   return `RGBA(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -79,6 +94,7 @@ function decorate(block, style) {
   if (style.border) tooltip.borderColor = rgba(style.border);
   if (style.background) tooltip.backgroundColor = rgba(style.background, style.bgAlpha ?? 0.85);
   if (Object.keys(tooltip).length) block.tooltip = tooltip;
+  if (labelName(style.name)) block.name = labelName(style.name);
   if (style.sound) block.dropSound = style.sound;
   if (style.icon) {
     block.minimapIcon = { shape: style.icon.shape, borderColor: rgba(style.icon.border), fillColor: rgba(style.icon.fill), size: style.icon.size };

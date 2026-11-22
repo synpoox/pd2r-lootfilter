@@ -1,5 +1,5 @@
 import { TIERS, LEVELS, THEMES, buildCatalog } from './catalog.js';
-import { BASE_RARITY, KINDS, STYLED, alsoOf, baseOpts, compile, effectiveStyles, entryLook, evaluate, matches, merge, itemTierOf, kindsOf, presetTier, tierOf } from './compile.js';
+import { BASE_RARITY, KINDS, STYLED, alsoOf, baseOpts, compile, effectiveStyles, entryLook, evaluate, labelName, labelProblem, matches, merge, itemTierOf, kindsOf, presetTier, tierOf } from './compile.js';
 import * as game from './game-folder.js';
 
 const STORE = 'pd2r-filter-builder';
@@ -90,6 +90,7 @@ function cleanEdit(r) {
   for (const k of ['text', 'border', 'background']) if (k in r) e[k] = hex(r[k]);
   if (typeof r.bgAlpha === 'number') e.bgAlpha = Math.min(1, Math.max(0, r.bgAlpha));
   if ('sound' in r) e.sound = SOUNDS.includes(r.sound) ? r.sound : '';
+  if (labelName(r.name)) e.name = labelName(r.name);
   if ('icon' in r) {
     e.icon = r.icon && SHAPES.includes(r.icon.shape)
       ? { shape: r.icon.shape, size: Math.min(128, Math.max(4, Math.round(r.icon.size) || 10)), fill: hex(r.icon.fill) || '#ffffff', border: hex(r.icon.border) || '#000000' }
@@ -110,7 +111,7 @@ function cleanRule(r) {
   if (!b || typeof b !== 'object' || !b.conditions || typeof b.conditions !== 'object' || Array.isArray(b.conditions)) return null;
   const out = { conditions: b.conditions };
   if (typeof b.ruleName === 'string') out.ruleName = b.ruleName.slice(0, 200);
-  if (typeof b.name === 'string') out.name = b.name.slice(0, 200);
+  if (typeof b.name === 'string' && labelName(b.name) === b.name) out.name = b.name;
   if (typeof b.continue === 'boolean') out.continue = b.continue;
   if (keys[0] === 'show') {
     const tt = {};
@@ -186,7 +187,7 @@ function dropLabel(text, look, tier, st = styles) {
   const s = st[tier], css = [`color:${s.text || LOOK[look] || '#fff'}`];
   if (s.border) css.push(`border-color:${s.border}`);
   if (s.background) css.push(`background:${s.background}${alphaHex(s.bgAlpha)}`);
-  return `<span class="drop" style="${css.join(';')}">${esc(text)}</span><span class="ico">${iconSvg(s.icon)}</span>`;
+  return `<span class="drop${s.name ? ' named' : ''}" style="${css.join(';')}">${esc(s.name || text)}</span><span class="ico">${iconSvg(s.icon)}</span>`;
 }
 
 function tierPicker(name, current, label) {
@@ -284,7 +285,7 @@ function itemsHtml(group, groupTier) {
     }).join('')}</ul></div>`;
 }
 
-const FIELD_NAMES = { text: 'Text colour', border: 'Border', background: 'Background', bgAlpha: 'Background opacity', sound: 'Drop sound', icon: 'Minimap icon' };
+const FIELD_NAMES = { name: 'Label text', text: 'Text colour', border: 'Border', background: 'Background', bgAlpha: 'Background opacity', sound: 'Drop sound', icon: 'Minimap icon' };
 
 // The own-look editor for one row or item. Only changed fields are kept; the rest follow the tier.
 function entryEditor(key) {
@@ -305,8 +306,15 @@ function entryEditor(key) {
     <p class="kind-help">Anything you don't change follows the ${esc(t.name)} look${inherits}. Changing the tier keeps this look.</p>
     ${fields.length ? `<div class="own-fields"><span>Changed here</span>${fields.map(f => `<button type="button" data-field-reset="${f}" aria-label="${FIELD_NAMES[f]}: back to tier look" title="Back to tier look">${FIELD_NAMES[f]} <span aria-hidden="true">×</span></button>`).join('')}</div>` : ''}
     <div class="ground">${entryGround(key)}</div>
+    ${nameCtl('e-' + key.replace(/\W/g, '-'), edit.name, code ? st[tier].name || name : groupSample(group), !code)}
     ${controlsHtml('e-' + key.replace(/\W/g, '-'), st[tier], name)}</section>`;
 }
+function nameCtl(id, value, placeholder, row) {
+  return `<div class="ctl name-ctl"><label for="nm-${id}">Label text</label>
+    <textarea id="nm-${id}" data-style="name" rows="2" spellcheck="false" placeholder="${esc(placeholder)}" aria-describedby="nm-help-${id}">${esc(value ?? '')}</textarea>
+    <small id="nm-help-${id}" class="name-help">Shown on the ground instead of ${row ? "each item's" : "the item's"} name. Up to 3 lines of 55 characters, plain letters, numbers and symbols. Leave empty to keep the game's name.</small></div>`;
+}
+
 const entryGround = key => {
   const { group, code } = entryOf(key), tier = code ? itemTierOf(group, code, state) : tierOf(group, state);
   return `<span class="label-cell">${dropLabel(code ? itemByCode(code)?.n ?? code : groupSample(group), group.look, tier, entryStyles(group, code))}</span>`;
@@ -455,6 +463,16 @@ function editStyle(el, live = false) {
   const e = entry ? (lookStore(entry.code)[entry.code ?? entry.group.id] ??= {}) : (lookEdits()[tier] ??= {});
   const cur = entry ? entryStyles(entry.group, entry.code)[tier] : kindStyles(lookKind)[tier];
   const key = el.dataset.style ?? el.dataset.styleOff;
+  if (key === 'name') {
+    const problem = labelProblem(el.value), help = el.parentElement.querySelector('.name-help');
+    el.toggleAttribute('aria-invalid', Boolean(problem));
+    if (problem) { help.textContent = problem; help.classList.add('bad'); return; }
+    if (labelName(el.value)) e.name = labelName(el.value); else delete e.name;
+    if (!Object.keys(e).length) delete lookStore(entry.code)[entry.code ?? entry.group.id];
+    styles = effectiveStyles(state);
+    refreshRow(entry.group.id, `[data-entry="${entryKey}"] [data-style="name"]`);
+    return save();
+  }
   const icon = () => ({ shape: 'circle', size: 10, fill: '#ffffff', border: '#000000', ...cur.icon });
   if (el.dataset.styleOff) e[key] = el.checked ? '' : el.closest('.ctl').querySelector('input[type=color]').value;
   else if (key === 'bgAlpha') e.bgAlpha = Number(el.value);
@@ -628,7 +646,7 @@ function simLabel(item, result) {
   if (tt.borderColor) css.push(`border-color:${cssColor(tt.borderColor)}`);
   if (tt.backgroundColor) css.push(`background:${cssColor(tt.backgroundColor)}`);
   const icon = r?.minimapIcon && result.visible ? iconSvg({ shape: r.minimapIcon.shape, size: r.minimapIcon.size, fill: r.minimapIcon.fillColor, border: r.minimapIcon.borderColor }, 14) : '';
-  return `<button class="sim-drop${result.visible ? '' : ' is-hidden'}${sim.selected === item.id ? ' selected' : ''}" type="button" data-sim="${item.id}" style="${css.join(';')}">${esc(nameOf(item))}${icon ? `<span class="sim-ico">${icon}</span>` : ''}</button>`;
+  return `<button class="sim-drop${result.visible ? '' : ' is-hidden'}${sim.selected === item.id ? ' selected' : ''}" type="button" data-sim="${item.id}" style="${css.join(';')}">${esc(result.visible && r?.name ? r.name : nameOf(item))}${icon ? `<span class="sim-ico">${icon}</span>` : ''}</button>`;
 }
 
 function simulateView() {
