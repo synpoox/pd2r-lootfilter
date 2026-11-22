@@ -593,7 +593,7 @@ function rollItem(scenario) {
   const runes = (lo, hi) => ({ code: 'r' + String(lo + Math.floor(Math.random() * (hi - lo + 1))).padStart(2, '0'), rarity: 'normal' });
   const code = list => ({ code: pick(list), rarity: 'normal' });
   const currency = ['imma', 'imrn', 'imra', 'rera', 'scou', 'upma', 'fort', 'upmp', 'wss', 'jewf', 'lpp', 'crfb', 'crfc', 'toa', 'scrb'];
-  const ubers = ['pk1', 'pk2', 'pk3', 'dhn', 'bey', 'mbr', 'tes', 'ceh', 'bet', 'fed', 'dcma', 'rtma', 'xa1', 'um1', 'luv'];
+  const ubers = ['pk1', 'pk2', 'pk3', 'dhn', 'bey', 'mbr', 'tes', 'ceh', 'bet', 'fed', 'dcma', 'rtma', 'xa1', 'ua1', 'um1'];
   const potions = ['hp1', 'hp2', 'hp3', 'hp4', 'hp5', 'mp2', 'mp4', 'mp5', 'rvs', 'rvl', 'vps', 'yps'];
   const misc = ['tsc', 'isc', 'key', 'aqv', 'cqv', 'gld', 'gld'];
   const gems = miscOfType(['gema', 'gemt', 'gems', 'geme', 'gemr', 'gemd', 'gemz']);

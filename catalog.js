@@ -93,10 +93,10 @@ export function buildCatalog(data) {
       id: 'ubers', label: 'Ubers & bosses', blurb: 'Keys, organs, essences and pinnacle boss pieces.',
       groups: [
         codes('dclone', 'Diablo Clone pieces', ['dcma', 'dcbl', 'dcho', 'dcso'], 'S', {}, 'unique'),
-        codes('rathma', 'Rathma and Lilith pieces', ['rtma', 'rtmo', 'rtmv', 'rtmf', 'llmr', 'lsvl'], 'S', {}, 'unique'),
+        codes('rathma', 'Rathma and Lilith pieces', ['rtma', 'rtmo', 'rtmv', 'llmr', 'lsvl'], 'S', {}, 'unique'),
         codes('navigator', name('rtp') + ' and ' + name('rid'), ['rtp', 'rid'], 'S', {}, 'unique'),
-        codes('luv', name('luv'), ['luv'], 'S', {}, 'unique'),
-        codes('ancients', 'Ancients relics and sigils', ['uba', 'ubaa', 'ubab', 'ubac', 'ubtm'], 'A', {}, 'unique'),
+        // D2R's own Uber Ancients: the five statue drops open the Colossal Summit. PD2's relic, sigils and talisman are retired.
+        codes('ancients', 'Uber Ancients fragments', range('ua', 1, 5, 1), 'A', {}, 'unique'),
         codes('lucion', 'Lucion pieces', ['luca', 'lucb', 'lucc', 'lucd'], 'A', {}, 'unique'),
         codes('ears', 'Corrupted ears', ['ivea', 'ivez', 'iveb', 'ived', 'iven', 'ivep', 'ives'], 'A', {}, 'unique'),
         codes('ukeys', 'Uber keys', ['pk1', 'pk2', 'pk3'], 'A', {}, 'unique'),
