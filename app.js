@@ -22,7 +22,7 @@ let lookKind = ''; // Looks & sounds: '' edits every item, otherwise one rarity 
 
 /* ---------- state ---------- */
 
-const defaults = () => ({ name: 'My PD2R filter', level: 1, overrides: {}, itemOverrides: {}, baseOptions: {}, theme: THEMES[0].id, styleEdits: {}, rarityEdits: {}, rowLooks: {}, itemLooks: {}, picks: [], imported: null });
+const defaults = () => ({ name: 'My PD2R filter', level: 1, overrides: {}, itemOverrides: {}, baseOptions: {}, goldMin: 0, theme: THEMES[0].id, styleEdits: {}, rarityEdits: {}, rowLooks: {}, itemLooks: {}, picks: [], imported: null });
 const hex = v => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : '');
 const itemByCode = code => (Object.hasOwn(data.misc, code) ? data.misc[code] : Object.hasOwn(data.bases, code) ? data.bases[code] : undefined);
 const typeName = t => data.types[t]?.n ?? t;
@@ -48,6 +48,7 @@ function sanitize(raw) {
     if (['any', 'only', 'no'].includes(o.eth)) e.eth = o.eth;
     s.baseOptions[id] = e;
   }
+  if (GOLD_STEPS.includes(raw.goldMin)) s.goldMin = raw.goldMin;
   if (THEMES.some(t => t.id === raw.theme)) s.theme = raw.theme;
   s.styleEdits = cleanEdits(raw.styleEdits);
   for (const k of KINDS) {
@@ -228,7 +229,7 @@ function rowHtml(group) {
   const tier = tierOf(group, state);
   const own = (group.codes ?? []).filter(c => c in state.itemOverrides).length;
   const ownLooks = (group.codes ?? []).filter(c => c in state.itemLooks).length, rowLook = group.id in state.rowLooks;
-  const changed = group.id in state.overrides || own > 0 || rowLook || ownLooks > 0 || Object.keys(state.baseOptions[group.id] ?? {}).length > 0;
+  const changed = group.id in state.overrides || own > 0 || rowLook || ownLooks > 0 || Object.keys(state.baseOptions[group.id] ?? {}).length > 0 || (group.id === 'gold' && state.goldMin > 0);
   const preset = TIERS.find(t => t.id === presetTier(group, state.level)).name;
   const many = group.codes?.length > 1, open = expanded.has(group.id);
   return `<li class="row${changed ? ' changed' : ''}${open ? ' open' : ''}" data-group="${group.id}">
@@ -239,10 +240,24 @@ function rowHtml(group) {
     <div class="row-detail"><small>${esc(groupDetail(group))}</small>
       ${group.opts ? `<details class="base-opts-wrap"${openOpts.has(group.id) ? ' open' : ''}>
       <summary data-opts="${group.id}"><span>Base options</span> ${esc(baseSummary(baseOpts(group, state)))}</summary>${baseOptsHtml(group)}</details>` : ''}
+      ${group.id === 'gold' && tier !== 'HIDE' ? `<details class="base-opts-wrap"${openOpts.has(group.id) ? ' open' : ''}>
+      <summary data-opts="${group.id}"><span>Gold amount</span> ${esc(goldSummary(state.goldMin))}</summary>${goldHtml()}</details>` : ''}
       ${many ? `<button class="expand" type="button" data-expand="${group.id}" aria-expanded="${open}">${open ? 'Collapse' : `Set the ${group.codes.length} items one by one${own + ownLooks ? ` · ${own + ownLooks} set separately` : ''}`}</button>` : ''}</div>
     ${lookOpen === 'row:' + group.id ? `<div class="entry-wrap">${entryEditor('row:' + group.id)}</div>` : ''}
     ${open ? itemsHtml(group, tier) : ''}
   </li>`;
+}
+
+// Pile sizes the slider steps through; 0 shows every pile.
+const GOLD_STEPS = [0, 50, 100, 250, 500, 1000, 1500, 2000, 3000, 5000, 7500, 10000];
+const goldSummary = n => (n ? `piles under ${n.toLocaleString('en-US')} hidden` : 'every pile shows');
+function goldHtml() {
+  const i = GOLD_STEPS.indexOf(state.goldMin);
+  return `<div class="gold-opts">
+    <label for="gold-min">Hide piles under</label>
+    <input id="gold-min" type="range" min="0" max="${GOLD_STEPS.length - 1}" step="1" value="${i}" data-gold aria-valuetext="${esc(goldSummary(state.goldMin))}">
+    <output for="gold-min">${state.goldMin ? `${state.goldMin.toLocaleString('en-US')} gold` : 'Off'}</output>
+    <p class="fine">Hidden gold is still picked up when you walk over it.</p></div>`;
 }
 
 const opt = (value, label, current) => `<option value="${value}" ${String(value) === String(current) ? 'selected' : ''}>${label}</option>`;
@@ -801,6 +816,7 @@ function setLevel(i) {
 
 function clearGroup(g) {
   delete state.overrides[g.id]; delete state.baseOptions[g.id]; delete state.rowLooks[g.id];
+  if (g.id === 'gold') state.goldMin = 0;
   (g.codes ?? []).forEach(c => { delete state.itemOverrides[c]; delete state.itemLooks[c]; });
 }
 
@@ -855,6 +871,9 @@ function bind() {
       if (code) { if (el.value === tierOf(g, state)) delete state.itemOverrides[code]; else state.itemOverrides[code] = el.value; }
       else setGroupTier(g, el.value);
       renderLevels(); save(); renderView(); $('.why-fix .tier-select')?.focus();
+    } else if (el.hasAttribute('data-gold')) {
+      state.goldMin = GOLD_STEPS[Number(el.value)] ?? 0;
+      refreshRow('gold', '[data-gold]'); save();
     } else if (el.dataset.opt && row?.dataset.group) {
       const g = groupsById.get(row.dataset.group);
       setBaseOpt(g, el.dataset.opt, el.value);
@@ -898,6 +917,7 @@ function bind() {
   viewEl.addEventListener('input', e => {
     const t = e.target;
     if ((t.type === 'color' || t.type === 'range') && t.closest('[data-tier]')) editStyle(t, true);
+    else if (t.hasAttribute('data-gold')) { const n = GOLD_STEPS[Number(t.value)]; t.nextElementSibling.textContent = n ? `${n.toLocaleString('en-US')} gold` : 'Off'; }
     else if (t.id === 'pick-q') renderResults($('#pick-results'), t.value, 'data-add');
     else if (t.id === 'sim-q') renderResults($('#sim-results'), t.value, 'data-sim-add');
   });

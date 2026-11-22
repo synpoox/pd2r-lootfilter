@@ -142,6 +142,11 @@ export function compile(catalog, state) {
   rules.push(...(state.imported?.rules ?? []));
 
   for (const category of catalog) {
+    // Gold under the chosen amount: hidden before the Gold row shows the rest. Pyre reads a pile's amount as its quantity.
+    const gold = category.groups.find(g => g.id === 'gold');
+    if (gold && state.goldMin > 0 && tierOf(gold, state) !== 'HIDE') {
+      rules.push({ hide: { ruleName: `${category.label}: Gold under ${state.goldMin}`, conditions: { code: 'gld', quantity: { lt: state.goldMin } } } });
+    }
     // Code groups never overlap each other, so merge their items per tier (and extra conditions) to keep the file short.
     const byTier = new Map();
     for (const group of category.groups) {
@@ -198,6 +203,7 @@ export function matches(conditions, item, data) {
     if (key === 'tier' && (!base || !list(want).includes(base.tier))) return false;
     if (key === 'ethereal' && Boolean(item.ethereal) !== want) return false;
     if (key === 'sockets' && !num(want, item.sockets ?? 0)) return false;
+    if (key === 'quantity' && !num(want, item.gold ?? item.quantity ?? 1)) return false;
   }
   return true;
 }

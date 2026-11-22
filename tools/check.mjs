@@ -134,6 +134,13 @@ assert.equal(labelProblem('x'.repeat(56)), 'Keep each line to 55 characters.');
 assert.equal(labelProblem('x'.repeat(50) + '\n' + 'y'.repeat(40)), 'Keep the whole label to 79 characters.');
 assert.equal(labelName('  Ber  \r\n  rune '), 'Ber\nrune');
 
+// Gold amount: small piles hide before the Gold row, bigger ones still show.
+const goldy = compile(catalog, { ...base, level: 1, goldMin: 1000 });
+validate(goldy);
+assert.equal(sim(goldy, { code: 'gld', rarity: 'normal', gold: 999 }).visible, false, 'pile under the amount hides');
+assert.equal(sim(goldy, { code: 'gld', rarity: 'normal', gold: 1000 }).visible, true, 'pile at the amount shows');
+assert.equal(sim(regular, { code: 'gld', rarity: 'normal', gold: 5 }).visible, true, 'off by default');
+
 // Worst case the app allows (200 picks, 3300 kept rules, every rarity and every item looked) stays under Pyre's 4096 rules.
 const allKinds = Object.fromEntries(['unique', 'set', 'rare', 'crafted', 'magic', 'base'].map(k => [k, Object.fromEntries(['S', 'A', 'N', 'B', 'SHOW'].map(t => [t, { sound: 'Filter01' }]))]));
 const everyCode = catalog.flatMap(c => c.groups).flatMap(g => g.codes ?? []);

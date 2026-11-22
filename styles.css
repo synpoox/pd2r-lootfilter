@@ -328,3 +328,10 @@ pre{max-height:360px;overflow:auto;font-size:12px;background:#000;border:1px sol
 .name-ctl textarea[aria-invalid]{border-color:var(--t-S)}
 .name-help{color:var(--soft);font-size:13px}
 .name-help.bad{color:var(--text)}
+
+/* Gold amount slider */
+.gold-opts{display:grid;grid-template-columns:auto minmax(140px,280px) auto;align-items:center;gap:6px 12px;margin:8px 0 4px;font-size:13px;color:var(--soft)}
+.gold-opts input[type=range]{width:100%;accent-color:var(--accent)}
+.gold-opts output{font-weight:700;color:var(--text);min-width:9ch}
+.gold-opts .fine{grid-column:1/-1;margin:0}
+@media (max-width:820px){.gold-opts{grid-template-columns:1fr auto}.gold-opts label{grid-column:1/-1}.gold-opts input[type=range]{min-height:44px}}
