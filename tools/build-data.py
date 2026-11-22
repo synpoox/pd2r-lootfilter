@@ -1,7 +1,7 @@
 """Export the PD2R item data the filter builder needs.
 
-Usage: python filter-builder/tools/build-data.py <path to pd2-resurrected checkout>
-Writes filter-builder/data/pd2r-items.json from files/data (the committed mod tables).
+Usage: python tools/build-data.py <path to pd2-resurrected checkout>
+Writes data/pd2r-items.json from files/data (the committed mod tables).
 """
 import csv
 import json

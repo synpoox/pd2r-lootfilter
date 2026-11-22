@@ -39,8 +39,8 @@ Runeword & crafting bases match elite white or superior bases only when they hav
 ## Update the item data
 
 ```
-python filter-builder/tools/build-data.py ../pd2-resurrected
-node filter-builder/tools/check.mjs
+python tools/build-data.py ../pd2-resurrected
+node tools/check.mjs
 ```
 
 The check confirms every code and item type in `catalog.js` exists in the mod data, every compiled filter fits the plugin's schema (rule keys, 64-value condition arrays, colours, sounds, icon shapes), stricter levels never show what an easier level hid, per-item tiers split a group, and the simulator's matcher picks the expected rule for sample items.
@@ -53,4 +53,4 @@ The check confirms every code and item type in `catalog.js` exists in the mod da
 
 ## Hosting
 
-The `Filter builder: GitHub Pages` workflow only runs when started by hand (Actions → Run workflow), and Pages must be enabled with **GitHub Actions** as the source. Nothing deploys on push.
+Live at https://synpoox.github.io/pd2r-lootfilter/. The `GitHub Pages` workflow only runs when started by hand (Actions → Run workflow), and Pages must be enabled with **GitHub Actions** as the source. Nothing deploys on push.

@@ -1,5 +1,5 @@
 // Self-check: every catalog code exists in the PD2R data and every compiled filter fits Pyre's schema.
-// Run: node filter-builder/tools/check.mjs
+// Run: node tools/check.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { buildCatalog, LEVELS, THEMES } from '../catalog.js';
