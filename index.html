@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="launcher">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Loot Filter Builder · Project Diablo 2: Resurrected</title>
+  <meta name="description" content="Build a loot filter for Project Diablo 2: Resurrected in your browser. Pick a strictness, adjust what you see, download filter.json.">
+  <link rel="icon" href="mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="rail">
+    <a class="identity" href="https://github.com/synpoox/pd2-resurrected" aria-label="Project Diablo 2: Resurrected on GitHub">
+      <span class="brand-mark" aria-hidden="true">/</span>
+      <span class="brand-name">Project Resurrected</span>
+    </a>
+    <span class="rail-title">Loot Filter Builder</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/synpoox/pd2-resurrected#loot-filters">Mod README</a>
+      <a href="https://discord.com/invite/KWGqVxmpDR">Discord</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="intro">
+      <div>
+        <span class="ribbon">PROJECT DIABLO 2: RESURRECTED</span>
+        <h1>Build your loot filter</h1>
+        <p class="lead">Choose how strict it should be, change anything you disagree with, then download <code>filter.json</code>. Everything saves in this browser as you go.</p>
+      </div>
+      <ol class="steps" aria-label="How it works">
+        <li><b>1</b> Pick a strictness</li>
+        <li><b>2</b> Adjust items and looks</li>
+        <li><b>3</b> Download and install</li>
+      </ol>
+    </section>
+
+    <section class="strictness" aria-labelledby="strictness-title">
+      <h2 id="strictness-title" class="section-label">1 · Strictness</h2>
+      <div id="levels" class="levels" role="radiogroup" aria-labelledby="strictness-title"></div>
+      <p id="level-hint" class="level-hint" aria-live="polite"></p>
+    </section>
+
+    <div class="workspace">
+      <nav class="sidebar" aria-label="Item categories">
+        <h2 class="section-label">2 · Adjust</h2>
+        <ul id="categories"></ul>
+      </nav>
+
+      <section class="editor" aria-live="off">
+        <div class="search">
+          <label for="search" class="visually-hidden">Search items</label>
+          <input id="search" type="search" placeholder="Search every item, e.g. Ber, Shako, grand charm" autocomplete="off">
+        </div>
+        <div id="view"></div>
+      </section>
+
+      <aside class="export" aria-labelledby="export-title">
+        <h2 id="export-title" class="section-label">3 · Install</h2>
+        <label class="field" for="filter-name">Filter name <span>shown in the game's profile list</span></label>
+        <input id="filter-name" maxlength="60">
+        <section id="game" class="game" aria-label="Game folder"></section>
+        <p id="export-status" class="status" role="status"></p>
+        <p id="summary" class="summary"></p>
+        <div class="export-row">
+          <button id="download" class="button secondary" type="button">Download .json</button>
+          <button id="copy-json" class="button secondary" type="button">Copy JSON</button>
+          <button id="share" class="button secondary" type="button">Copy share link</button>
+        </div>
+        <details class="install">
+          <summary>Install by hand</summary>
+          <ol>
+            <li>Open your D2R folder, then <code>mods\PD2Resurrected\d2rloader\config\filter\</code>. Create the <code>filter</code> folder if it is missing.</li>
+            <li>Save the downloaded file there. Any name ending in <code>.json</code> works.</li>
+            <li>In game: <b>Esc → Options → Gameplay → Loot Filter Profile</b>, pick your filter.</li>
+          </ol>
+          <p class="fine">Edits reload on save, or press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F9</kbd>. Hold <kbd>Ctrl</kbd> to pick up hidden items. A mod update can replace <code>config\filter.json</code>, so keep yours in the <code>filter</code> folder.</p>
+        </details>
+        <details class="json">
+          <summary>Preview the file</summary>
+          <pre id="json" tabindex="0"></pre>
+        </details>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <p>Item data from <a id="data-source" href="https://github.com/synpoox/pd2-resurrected">pd2-resurrected</a>. Filters run on the <a href="https://github.com/Pyre-Flies/D2R-Mods/blob/main/plugins/pyre-lootfilter/README.md">Pyre Loot Filter</a> plugin the mod ships. Inspired by the <a href="https://www.d2r-reimagined.com/loot-filterv2">D2R Reimagined filter builder</a> and <a href="https://www.filterblade.xyz/">FilterBlade</a>.</p>
+  </footer>
+  <noscript><p class="noscript">The filter builder needs JavaScript.</p></noscript>
+</body>
+</html>
