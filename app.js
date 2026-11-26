@@ -1,5 +1,5 @@
-import { TIERS, LEVELS, THEMES, buildCatalog } from './catalog.js';
-import { BASE_RARITY, KINDS, STYLED, alsoOf, baseOpts, compile, effectiveStyles, entryLook, evaluate, labelName, labelProblem, matches, merge, itemTierOf, kindsOf, presetTier, tierOf } from './compile.js';
+import { TIERS, LEVELS, THEMES, VANILLA, buildCatalog, upgradeLevel, upgradeRows } from './catalog.js';
+import { BASE_RARITY, KINDS, STYLED, alsoOf, baseOpts, compile, effectiveStyles, entryLook, evaluate, goldOf, labelName, labelProblem, matches, merge, itemKey, itemTierOf, paint, pickTint, kindsOf, presetTier, tierOf } from './compile.js';
 import * as game from './game-folder.js';
 
 const STORE = 'pd2r-filter-builder';
@@ -7,7 +7,6 @@ const SOUNDS = Array.from({ length: 16 }, (_, i) => `Filter${String(i + 1).padSt
 const SHAPES = ['circle', 'square', 'diamond', 'triangle', 'triangleDown', 'star', 'spark', 'kite', 'hexagon', 'cross', 'chevron', 'bullseye'];
 const RARITIES = ['inferior', 'normal', 'superior', 'magic', 'rare', 'set', 'unique', 'crafted'];
 const TIER_IDS = TIERS.map(t => t.id);
-const LOOK = { unique: '#c7b377', set: '#1eff00', rare: '#ffff64', magic: '#7878ff', crafted: '#ffa800', rune: '#ffa800', gray: '#9a9a9a', normal: '#ffffff', superior: '#ffffff', inferior: '#9a9a9a', gold: '#ffffff', 'potion-r': '#e070e0', 'potion-h': '#ffffff' };
 
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -22,7 +21,7 @@ let lookKind = ''; // Looks & sounds: '' edits every item, otherwise one rarity 
 
 /* ---------- state ---------- */
 
-const defaults = () => ({ name: 'My PD2R filter', level: 1, overrides: {}, itemOverrides: {}, baseOptions: {}, goldMin: 0, theme: THEMES[0].id, styleEdits: {}, rarityEdits: {}, rowLooks: {}, itemLooks: {}, picks: [], imported: null });
+const defaults = () => ({ v: 2, name: 'My PD2R filter', level: 1, overrides: {}, itemOverrides: {}, baseOptions: {}, goldMin: null, theme: THEMES[0].id, styleEdits: {}, rarityEdits: {}, rowLooks: {}, itemLooks: {}, picks: [], imported: null });
 const hex = v => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : '');
 const itemByCode = code => (Object.hasOwn(data.misc, code) ? data.misc[code] : Object.hasOwn(data.bases, code) ? data.bases[code] : undefined);
 const typeName = t => data.types[t]?.n ?? t;
@@ -32,9 +31,10 @@ function sanitize(raw) {
   const s = defaults();
   if (!raw || typeof raw !== 'object') return s;
   if (typeof raw.name === 'string') s.name = raw.name.slice(0, 60);
-  if (Number.isInteger(raw.level) && raw.level >= 0 && raw.level < LEVELS.length) s.level = raw.level;
+  const level = upgradeLevel(raw);
+  if (Number.isInteger(level) && level >= 0 && level < LEVELS.length) s.level = level;
   for (const [code, t] of Object.entries(raw.itemOverrides ?? {})) if (groupOfCode.has(code) && TIER_IDS.includes(t)) s.itemOverrides[code] = t;
-  for (const [id, t] of Object.entries(raw.overrides ?? {})) {
+  for (const [id, t] of Object.entries(upgradeRows(raw, raw.overrides))) {
     if (!TIER_IDS.includes(t)) continue;
     if (groupsById.has(id)) s.overrides[id] = t;
     // Runes and orbs used to have a row each, keyed by item code: keep those choices as item tiers.
@@ -48,14 +48,15 @@ function sanitize(raw) {
     if (['any', 'only', 'no'].includes(o.eth)) e.eth = o.eth;
     s.baseOptions[id] = e;
   }
-  if (GOLD_STEPS.includes(raw.goldMin)) s.goldMin = raw.goldMin;
+  // Before v2, 0 was the untouched default; it now follows the level.
+  if (GOLD_STEPS.includes(raw.goldMin) && (raw.v === 2 || raw.goldMin > 0)) s.goldMin = raw.goldMin;
   if (THEMES.some(t => t.id === raw.theme)) s.theme = raw.theme;
   s.styleEdits = cleanEdits(raw.styleEdits);
   for (const k of KINDS) {
     const e = cleanEdits(raw.rarityEdits?.[k.id]);
     if (Object.keys(e).length) s.rarityEdits[k.id] = e;
   }
-  for (const [id, r] of Object.entries(raw.rowLooks ?? {})) { const e = cleanEdit(r); if (groupsById.has(id) && Object.keys(e).length) s.rowLooks[id] = e; }
+  for (const [id, r] of Object.entries(upgradeRows(raw, raw.rowLooks))) { const e = cleanEdit(r); if (groupsById.has(id) && Object.keys(e).length) s.rowLooks[id] = e; }
   for (const [code, r] of Object.entries(raw.itemLooks ?? {})) { const e = cleanEdit(r); if (groupOfCode.has(code) && Object.keys(e).length) s.itemLooks[code] = e; }
   for (const p of Array.isArray(raw.picks) ? raw.picks.slice(0, 200) : []) {
     const item = itemByCode(p?.code);
@@ -102,7 +103,7 @@ function cleanEdit(r) {
 
 // A rule from another filter: one show/hide block with a conditions object. It is rebuilt from the fields
 // Pyre knows, each checked, because these come from shared links and files and are shown on the page.
-const MAX_KEPT = 3300; // with 200 picks and the builder's rows, stays under Pyre's 4096 rules
+const MAX_KEPT = 2900; // with 200 picks and the builder's rows, stays under Pyre's 4096 rules
 const RGBA_RE = /^RGBA\(\d{1,3}, ?\d{1,3}, ?\d{1,3}(, ?(0|1|0?\.\d+))?\)$/i;
 function cleanRule(r) {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
@@ -185,7 +186,7 @@ const alphaHex = a => Math.round((a ?? 0.85) * 255).toString(16).padStart(2, '0'
 
 function dropLabel(text, look, tier, st = styles) {
   if (tier === 'HIDE') return `<span class="drop is-hidden">${esc(text)}</span><span class="ico"></span>`;
-  const s = st[tier], css = [`color:${s.text || LOOK[look] || '#fff'}`];
+  const s = paint(st[tier], look), css = [`color:${s.text || VANILLA[look] || '#fff'}`];
   if (s.border) css.push(`border-color:${s.border}`);
   if (s.background) css.push(`background:${s.background}${alphaHex(s.bgAlpha)}`);
   return `<span class="drop${s.name ? ' named' : ''}" style="${css.join(';')}">${esc(s.name || text)}</span><span class="ico">${iconSvg(s.icon)}</span>`;
@@ -196,22 +197,27 @@ function tierPicker(name, current, label) {
   return `<select class="tier-select" name="${esc(name)}" data-t="${current}" data-tier-pick aria-label="${esc(label)}: tier" title="${esc(t.name + ': ' + t.hint)}">${TIERS.map(x => `<option value="${x.id}" ${x.id === current ? 'selected' : ''}>${x.name}</option>`).join('')}</select>`;
 }
 
-const groupSample = group => group.sample ?? itemByCode(group.codes[0])?.n ?? group.label;
+// What a row's item is called: unique and set rows name the items on the base, other rows the base.
+const itemName = (group, code) => (group.rarity && data[group.rarity + 's'][code]?.join(' / ')) || (itemByCode(code)?.n ?? code);
+const groupSample = group => group.sample ?? (group.rarity ? data[group.rarity + 's'][group.codes[0]]?.[0] : null) ?? itemByCode(group.codes[0])?.n ?? group.label;
 const kindStyles = kind => (kind ? effectiveStyles(state, kind) : styles);
 // A row covering exactly one rarity kind previews that kind's look.
 const groupStyles = group => { const k = kindsOf(group.when ?? alsoOf(group, state)); return kindStyles(k.length === 1 ? k[0] : ''); };
 // The styles an entry previews with: its tier look with the entry's own look on top.
 const entryStyles = (group, code) => {
-  const st = groupStyles(group), look = entryLook(state, group, code);
-  return look ? Object.fromEntries(Object.entries(st).map(([t, v]) => [t, merge(v, look)])) : st;
+  return Object.fromEntries(Object.entries(groupStyles(group)).map(([t, v]) => {
+    const look = entryLook(state, group, code, t);
+    return [t, look ? merge(v, look) : v];
+  }));
 };
-const entryOf = key => { const [kind, id] = key.split(':'); return kind === 'item' ? { group: groupOfCode.get(id), code: id } : { group: groupsById.get(id), code: null }; };
+const entryOf = key => { const [kind, id] = key.split(':'); return kind === 'item' ? { group: groupOfCode.get(id), code: id.split('@')[0] } : { group: groupsById.get(id), code: null }; };
+const storeId = (group, code) => (code ? itemKey(group, code) : group.id);
 const lookStore = code => (code ? state.itemLooks : state.rowLooks);
 const lookBtn = (key, text, look, tier, st, name) => `<button class="label-cell look-btn" type="button" data-look="${esc(key)}" aria-expanded="${lookOpen === key}" aria-label="${esc(name)}: change this look" title="Change this look">${dropLabel(text, look, tier, st)}</button>`;
 
 function groupDetail(group) {
   if (group.codes) {
-    return [...new Set(group.codes.map(c => itemByCode(c)?.n ?? c))].join(', ');
+    return [...new Set(group.codes.map(c => itemName(group, c)))].join(', ');
   }
   const w = group.when, parts = [];
   if (w.rarity) parts.push([].concat(w.rarity).join(' or '));
@@ -219,7 +225,7 @@ function groupDetail(group) {
   if (w.ethereal) parts.push('ethereal');
   if (w.sockets) parts.push('1+ sockets');
   if (w.itemType) parts.push([].concat(w.itemType).map(typeName).join(' or '));
-  if (w.code) parts.push(itemByCode(w.code)?.n ?? w.code);
+  if (w.code) parts.push([].concat(w.code).map(c => itemByCode(c)?.n ?? c).join(', '));
   return parts.join(' · ');
 }
 
@@ -227,9 +233,10 @@ function groupDetail(group) {
 
 function rowHtml(group) {
   const tier = tierOf(group, state);
-  const own = (group.codes ?? []).filter(c => c in state.itemOverrides).length;
-  const ownLooks = (group.codes ?? []).filter(c => c in state.itemLooks).length, rowLook = group.id in state.rowLooks;
-  const changed = group.id in state.overrides || own > 0 || rowLook || ownLooks > 0 || Object.keys(state.baseOptions[group.id] ?? {}).length > 0 || (group.id === 'gold' && state.goldMin > 0);
+  const keys = (group.codes ?? []).map(c => itemKey(group, c));
+  const own = keys.filter(k => k in state.itemOverrides).length;
+  const ownLooks = keys.filter(k => k in state.itemLooks).length, rowLook = group.id in state.rowLooks;
+  const changed = group.id in state.overrides || own > 0 || rowLook || ownLooks > 0 || Object.keys(state.baseOptions[group.id] ?? {}).length > 0 || (group.id === 'gold' && state.goldMin !== null);
   const preset = TIERS.find(t => t.id === presetTier(group, state.level)).name;
   const many = group.codes?.length > 1, open = expanded.has(group.id);
   return `<li class="row${changed ? ' changed' : ''}${open ? ' open' : ''}" data-group="${group.id}">
@@ -241,7 +248,7 @@ function rowHtml(group) {
       ${group.opts ? `<details class="base-opts-wrap"${openOpts.has(group.id) ? ' open' : ''}>
       <summary data-opts="${group.id}"><span>Base options</span> ${esc(baseSummary(baseOpts(group, state)))}</summary>${baseOptsHtml(group)}</details>` : ''}
       ${group.id === 'gold' && tier !== 'HIDE' ? `<details class="base-opts-wrap"${openOpts.has(group.id) ? ' open' : ''}>
-      <summary data-opts="${group.id}"><span>Gold amount</span> ${esc(goldSummary(state.goldMin))}</summary>${goldHtml()}</details>` : ''}
+      <summary data-opts="${group.id}"><span>Gold amount</span> ${esc(goldSummary(goldOf(state)))}</summary>${goldHtml()}</details>` : ''}
       ${many ? `<button class="expand" type="button" data-expand="${group.id}" aria-expanded="${open}">${open ? 'Collapse' : `Set the ${group.codes.length} items one by one${own + ownLooks ? ` · ${own + ownLooks} set separately` : ''}`}</button>` : ''}</div>
     ${lookOpen === 'row:' + group.id ? `<div class="entry-wrap">${entryEditor('row:' + group.id)}</div>` : ''}
     ${open ? itemsHtml(group, tier) : ''}
@@ -252,11 +259,11 @@ function rowHtml(group) {
 const GOLD_STEPS = [0, 50, 100, 250, 500, 1000, 1500, 2000, 3000, 5000, 7500, 10000];
 const goldSummary = n => (n ? `piles under ${n.toLocaleString('en-US')} hidden` : 'every pile shows');
 function goldHtml() {
-  const i = GOLD_STEPS.indexOf(state.goldMin);
+  const min = goldOf(state), i = GOLD_STEPS.indexOf(min);
   return `<div class="gold-opts">
     <label for="gold-min">Hide piles under</label>
-    <input id="gold-min" type="range" min="0" max="${GOLD_STEPS.length - 1}" step="1" value="${i}" data-gold aria-valuetext="${esc(goldSummary(state.goldMin))}">
-    <output for="gold-min">${state.goldMin ? `${state.goldMin.toLocaleString('en-US')} gold` : 'Off'}</output>
+    <input id="gold-min" type="range" min="0" max="${GOLD_STEPS.length - 1}" step="1" value="${i}" data-gold aria-valuetext="${esc(goldSummary(min))}">
+    <output for="gold-min">${min ? `${min.toLocaleString('en-US')} gold` : 'Off'}</output>
     <p class="fine">Hidden gold is still picked up when you walk over it.</p></div>`;
 }
 
@@ -292,11 +299,11 @@ function setBaseOpt(group, key, raw) {
 function itemsHtml(group, groupTier) {
   return `<div class="items"><p class="items-help">Pick a tier for any item to pull it out of the group. Pick <b>${esc(TIERS.find(t => t.id === groupTier).name)}</b> to put it back. Click an item's label to give it its own look.</p>
     <ul>${group.codes.map(code => {
-      const own = code in state.itemOverrides, tier = itemTierOf(group, code, state), name = itemByCode(code)?.n ?? code, key = 'item:' + code;
-      return `<li class="item${own ? ' own' : ''}" data-code="${esc(code)}">
+      const id = itemKey(group, code), own = id in state.itemOverrides, tier = itemTierOf(group, code, state), name = itemName(group, code), key = 'item:' + id;
+      return `<li class="item${own ? ' own' : ''}" data-code="${esc(id)}">
         <div class="item-name">${lookBtn(key, name, group.look, tier, entryStyles(group, code), name)}
-          <span class="badge">${own ? 'Own tier' : 'In group'}</span>${code in state.itemLooks ? '<span class="badge look-badge">Own look</span>' : ''}</div>
-        ${tierPicker('i-' + code, tier, name)}</li>${lookOpen === key ? `<li class="entry-wrap">${entryEditor(key)}</li>` : ''}`;
+          <span class="badge">${own ? 'Own tier' : 'In group'}</span>${id in state.itemLooks ? '<span class="badge look-badge">Own look</span>' : ''}${group.rarity ? `<small>${esc(itemByCode(code)?.n ?? code)}</small>` : ''}</div>
+        ${tierPicker('i-' + id, tier, name)}</li>${lookOpen === key ? `<li class="entry-wrap">${entryEditor(key)}</li>` : ''}`;
     }).join('')}</ul></div>`;
 }
 
@@ -306,8 +313,8 @@ const FIELD_NAMES = { name: 'Label text', text: 'Text colour', border: 'Border',
 function entryEditor(key) {
   const { group, code } = entryOf(key);
   const tier = code ? itemTierOf(group, code, state) : tierOf(group, state);
-  const name = code ? itemByCode(code)?.n ?? code : group.label;
-  const t = TIERS.find(x => x.id === tier), edit = lookStore(code)[code ?? group.id] ?? {};
+  const name = code ? itemName(group, code) : group.label;
+  const t = TIERS.find(x => x.id === tier), edit = lookStore(code)[storeId(group, code)] ?? {};
   const fields = Object.keys(edit);
   const head = `<div class="inline-head"><h3>${esc(name)} <span>· own look</span></h3>
       ${fields.length ? '<button class="link-btn" type="button" data-entry-reset>Back to tier look</button>' : ''}
@@ -332,7 +339,7 @@ function nameCtl(id, value, placeholder, row) {
 
 const entryGround = key => {
   const { group, code } = entryOf(key), tier = code ? itemTierOf(group, code, state) : tierOf(group, state);
-  return `<span class="label-cell">${dropLabel(code ? itemByCode(code)?.n ?? code : groupSample(group), group.look, tier, entryStyles(group, code))}</span>`;
+  return `<span class="label-cell">${dropLabel(code ? itemName(group, code) : groupSample(group), group.look, tier, entryStyles(group, code))}</span>`;
 };
 
 
@@ -466,8 +473,10 @@ function controlsHtml(id, st, name) {
         </div>`;
 }
 
-function colorCtl(key, label, off, value) {
-  return `<div class="ctl">${label}<span class="inline">
+function colorCtl(key, label, off, raw) {
+  // A theme colour that follows the item shows here as the unique colour until the player picks a fixed one.
+  const value = paint({ [key]: raw }, 'unique')[key];
+  return `<div class="ctl">${label}${value === raw ? '' : ' (follows item colour)'}<span class="inline">
     <input type="color" value="${value || '#ffffff'}" data-style="${key}" ${value ? '' : 'disabled'} aria-label="${label}">
     <label class="inline"><input type="checkbox" data-style-off="${key}" ${value ? '' : 'checked'}> ${off}</label></span></div>`;
 }
@@ -544,7 +553,7 @@ function pickRow(p) {
   const item = itemByCode(p.code);
   const text = (p.ethereal ? 'Ethereal ' : '') + p.label + (p.sockets ? ` [${p.sockets}+]` : '');
   return `<li class="row" data-pick="${p.id}">
-    <div class="label-cell">${dropLabel(text, p.rarity || (p.ethereal || p.sockets ? 'gray' : item.kind ? 'normal' : 'rune'), p.tier)}</div>
+    <div class="label-cell">${dropLabel(text, pickTint(catalog, p) ?? (p.ethereal || p.sockets ? 'gray' : 'normal'), p.tier)}</div>
     <div class="row-name"><b>${esc(p.label)}</b><small>${esc(p.code)} · ${esc(typeName(item.t))}${item.tier ? ' · ' + item.tier : ''}</small></div>
     <div class="row-tools">${tierPicker('p-' + p.id, p.tier, p.label)}</div>
     <div class="pick-opts">
@@ -657,7 +666,7 @@ const cssColor = v => (/^(rgba?\([\d.,\s]+\)|#[0-9a-f]{3,8}|[a-z]+)$/i.test(Stri
 
 function simLabel(item, result) {
   const r = result.rule, tt = r?.tooltip ?? {};
-  const css = [`color:${cssColor(tt.textColor) || LOOK[lookOf(item)]}`];
+  const css = [`color:${cssColor(tt.textColor) || VANILLA[lookOf(item)]}`];
   if (tt.borderColor) css.push(`border-color:${cssColor(tt.borderColor)}`);
   if (tt.backgroundColor) css.push(`background:${cssColor(tt.backgroundColor)}`);
   const icon = r?.minimapIcon && result.visible ? iconSvg({ shape: r.minimapIcon.shape, size: r.minimapIcon.size, fill: r.minimapIcon.fillColor, border: r.minimapIcon.borderColor }, 14) : '';
@@ -718,8 +727,8 @@ function whyFix(item, rule) {
   if (!hit) return '';
   const { cat, g } = hit, own = Boolean(g.codes);
   const tier = own ? itemTierOf(g, item.code, state) : tierOf(g, state);
-  const what = own && g.codes.length > 1 ? nameOf(item).replace(/^(Ethereal |Superior )/, '') : g.label;
-  return `<div class="why-fix" data-fix-group="${g.id}" data-fix-code="${own ? esc(item.code) : ''}">
+  const what = !own || g.codes.length < 2 ? g.label : g.rarity ? itemName(g, item.code) : nameOf(item).replace(/^(Ethereal |Superior )/, '');
+  return `<div class="why-fix" data-fix-group="${g.id}" data-fix-code="${own ? esc(itemKey(g, item.code)) : ''}">
       <label>Tier for <b>${esc(what)}</b> ${tierPicker('why-' + g.id, tier, what)}</label>
       <button class="link-btn" type="button" data-goto="${g.id}">Go to ${esc(cat.label)} › ${esc(g.label)}</button></div>`;
 }
@@ -816,8 +825,8 @@ function setLevel(i) {
 
 function clearGroup(g) {
   delete state.overrides[g.id]; delete state.baseOptions[g.id]; delete state.rowLooks[g.id];
-  if (g.id === 'gold') state.goldMin = 0;
-  (g.codes ?? []).forEach(c => { delete state.itemOverrides[c]; delete state.itemLooks[c]; });
+  if (g.id === 'gold') state.goldMin = null;
+  (g.codes ?? []).forEach(c => { delete state.itemOverrides[itemKey(g, c)]; delete state.itemLooks[itemKey(g, c)]; });
 }
 
 function openLook(key) {
@@ -896,7 +905,7 @@ function bind() {
     } else if (el.id === 'bulk' && el.value) {
       for (const g of catalog.find(c => c.id === el.dataset.cat).groups) {
         setGroupTier(g, el.value);
-        (g.codes ?? []).forEach(c => delete state.itemOverrides[c]);
+        (g.codes ?? []).forEach(c => delete state.itemOverrides[itemKey(g, c)]);
       }
       renderView(); renderLevels(); save();
     } else if (el.dataset.style || el.dataset.styleOff) {
@@ -1141,7 +1150,7 @@ async function start() {
   }
   catalog = buildCatalog(data);
   groupsById = new Map(catalog.flatMap(c => c.groups).map(g => [g.id, g]));
-  groupOfCode = new Map(catalog.flatMap(c => c.groups).flatMap(g => (g.codes ?? []).map(code => [code, g])));
+  groupOfCode = new Map(catalog.flatMap(c => c.groups).flatMap(g => (g.codes ?? []).map(code => [itemKey(g, code), g])));
   state = loadState();
   styles = effectiveStyles(state);
   if (location.hash) history.replaceState(null, '', location.pathname); // settings are now saved locally

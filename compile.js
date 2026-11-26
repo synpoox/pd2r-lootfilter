@@ -1,6 +1,6 @@
 // Turns builder settings into a Pyre Loot Filter filter.json (schema v3, first matching rule wins),
 // and evaluates items against it the way the plugin does, for the simulator.
-import { TIERS, THEMES } from './catalog.js';
+import { TIERS, LEVELS, THEMES, VANILLA } from './catalog.js';
 
 const MAX_VALUES = 64; // Pyre rejects condition arrays longer than this
 export const STYLED = ['S', 'A', 'N', 'B', 'SHOW'];
@@ -11,10 +11,14 @@ export function presetTier(group, level) {
   return tier;
 }
 
+// Gold piles under this amount are hidden: the player's choice, else the level's.
+export const goldOf = state => state.goldMin ?? LEVELS[state.level].gold;
+
 // Extra conditions of a base row: its default options with the player's changes on top.
 export const BASE_RARITY = { both: ['normal', 'superior'], normal: 'normal', superior: 'superior' };
 export const baseOpts = (group, state) => ({ ...group.opts, ...state.baseOptions?.[group.id] });
 export function alsoOf(group, state) {
+  if (group.rarity) return { rarity: group.rarity };
   if (!group.opts) return undefined;
   const o = baseOpts(group, state);
   const also = { rarity: BASE_RARITY[o.rarity] };
@@ -27,7 +31,9 @@ export function alsoOf(group, state) {
 }
 
 export const tierOf = (group, state) => state.overrides[group.id] ?? presetTier(group, state.level);
-export const itemTierOf = (group, code, state) => state.itemOverrides?.[code] ?? tierOf(group, state);
+// What an item's own tier and look are saved under: one base can sit in a unique, a set and a base row.
+export const itemKey = (group, code) => (group.rarity ? `${code}@${group.rarity}` : code);
+export const itemTierOf = (group, code, state) => state.itemOverrides?.[itemKey(group, code)] ?? tierOf(group, state);
 
 // Rarity groups that can get their own look per tier, on top of the tier look.
 export const KINDS = [
@@ -47,13 +53,26 @@ export const merge = (base, edit = {}) => {
   return { ...base, ...edit, icon: icon && { ...(base.icon ?? {}), ...icon } };
 };
 
-// An entry's own look: the row's edit, then the item's edit on top. Only changed fields, so the rest follow the tier.
-export function entryLook(state, group, code) {
-  const row = state.rowLooks?.[group.id], item = code ? state.itemLooks?.[code] : null;
-  if (!row && !item) return null;
-  if (!row || !item) return { ...(row ?? item) };
-  const out = { ...row, ...item };
-  if (row.icon && item.icon) out.icon = { ...row.icon, ...item.icon };
+// An entry's own look: the row's built-in one, the player's row edit, then the item's edit on top.
+// Only changed fields, so the rest follow the tier.
+export function entryLook(state, group, code, tier) {
+  const layers = [group.own, group.tierOwn?.[tier], state.rowLooks?.[group.id], code ? state.itemLooks?.[itemKey(group, code)] : null].filter(Boolean);
+  if (!layers.length) return null;
+  return layers.reduce((under, over) => {
+    const out = { ...under, ...over };
+    if (under.icon && over.icon) out.icon = { ...under.icon, ...over.icon };
+    return out;
+  }, {});
+}
+
+const SHADE = { item: 1, deep: 0.55 };
+// A style with its 'item' and 'deep' colours filled in from the item's game colour (grey when unknown).
+export function paint(style, tint) {
+  const out = { ...style };
+  for (const key of ['text', 'border', 'background']) {
+    const shade = SHADE[out[key]];
+    if (shade) out[key] = '#' + (VANILLA[tint] ?? VANILLA.gray).slice(1).replace(/../g, h => Math.round(parseInt(h, 16) * shade).toString(16).padStart(2, '0'));
+  }
   return out;
 }
 
@@ -102,22 +121,31 @@ function decorate(block, style) {
   return block;
 }
 
-function rule(tier, ruleName, conditions, styles, look) {
+function rule(tier, ruleName, conditions, styles, look, tint) {
   const block = { ruleName, conditions };
-  return tier === 'HIDE' ? { hide: block } : { show: decorate(block, look ? merge(styles[tier], look) : styles[tier]) };
+  return tier === 'HIDE' ? { hide: block } : { show: decorate(block, paint(look ? merge(styles[tier], look) : styles[tier], tint)) };
 }
 
 // One rule, styled for the rarities it checks. A rule spanning kinds that look different is split per kind.
-function emit(rules, tier, ruleName, conditions, state, styles, look = null) {
+// `tint` names the game colour of what the rule matches, where its rarity does not say.
+function emit(rules, tier, ruleName, conditions, state, styles, look = null, tint) {
   const kinds = tier === 'HIDE' ? [] : kindsOf(conditions);
+  const tintOf = k => (!k || k === 'base' ? tint : k);
+  if (kinds.length < 2) return rules.push(rule(tier, ruleName, conditions, styles(kinds[0]), look, tintOf(kinds[0])));
   const edited = kinds.filter(k => Object.keys(state.rarityEdits?.[k]?.[tier] ?? {}).length);
-  if (kinds.length === 1 || (kinds.length > 1 && !edited.length)) return rules.push(rule(tier, ruleName, conditions, styles(edited[0] ?? kinds[0]), look));
-  if (!kinds.length) return rules.push(rule(tier, ruleName, conditions, styles(), look));
+  const merged = merge(styles()[tier], look ?? {});
+  if (!edited.length && !['text', 'border', 'background'].some(key => merged[key] in SHADE)) {
+    return rules.push(rule(tier, ruleName, conditions, styles(kinds[0]), look, tint));
+  }
   for (const k of kinds) {
     const rarity = list(conditions.rarity).filter(r => KIND_OF[r] === k);
-    rules.push(rule(tier, ruleName, { ...conditions, rarity: rarity.length === 1 ? rarity[0] : rarity }, styles(k), look));
+    rules.push(rule(tier, ruleName, { ...conditions, rarity: rarity.length === 1 ? rarity[0] : rarity }, styles(k), look, tintOf(k)));
   }
 }
+
+// A pick without a rarity borrows the colour of the builder row that lists its code.
+export const pickTint = (catalog, pick) => pick.rarity
+  || catalog.flatMap(c => c.groups).find(g => !g.rarity && g.codes?.includes(pick.code))?.look;
 
 const chunk = (list, size) => Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, i * size + size));
 
@@ -136,7 +164,7 @@ export function compile(catalog, state) {
   const tierName = id => TIERS.find(t => t.id === id).name;
 
   for (const pick of state.picks) {
-    emit(rules, pick.tier, `My pick: ${pick.label}`, pickConditions(pick), state, styles);
+    emit(rules, pick.tier, `My pick: ${pick.label}`, pickConditions(pick), state, styles, null, pickTint(catalog, pick));
   }
   // Rules kept from a filter the builder did not make, exactly as they were.
   rules.push(...(state.imported?.rules ?? []));
@@ -144,30 +172,39 @@ export function compile(catalog, state) {
   for (const category of catalog) {
     // Gold under the chosen amount: hidden before the Gold row shows the rest. Pyre reads a pile's amount as its quantity.
     const gold = category.groups.find(g => g.id === 'gold');
-    if (gold && state.goldMin > 0 && tierOf(gold, state) !== 'HIDE') {
-      rules.push({ hide: { ruleName: `${category.label}: Gold under ${state.goldMin}`, conditions: { code: 'gld', quantity: { lt: state.goldMin } } } });
+    if (gold && goldOf(state) > 0 && tierOf(gold, state) !== 'HIDE') {
+      rules.push({ hide: { ruleName: `${category.label}: Gold under ${goldOf(state)}`, conditions: { code: 'gld', quantity: { lt: goldOf(state) } } } });
     }
     // Code groups never overlap each other, so merge their items per tier (and extra conditions) to keep the file short.
     const byTier = new Map();
+    const flush = () => {
+      for (const { tier, also, look, tint, codes } of byTier.values()) {
+        for (const part of chunk([...new Set(codes)], MAX_VALUES)) {
+          emit(rules, tier, `${category.label}: ${tierName(tier)}${look ? ' · own look' : ''}`, { code: part.length === 1 ? part[0] : part, ...also }, state, styles, look, tint);
+        }
+      }
+      byTier.clear();
+    };
     for (const group of category.groups) {
       if (group.codes) {
         for (const code of group.codes) {
           const tier = itemTierOf(group, code, state);
-          const also = alsoOf(group, state);
-          const look = tier === 'HIDE' ? null : entryLook(state, group, code);
-          const key = tier + JSON.stringify(also ?? {}) + JSON.stringify(look);
-          if (!byTier.has(key)) byTier.set(key, { tier, also, look, codes: [] });
+          let also = alsoOf(group, state);
+          // A level hiding a base row leaves ethereal ones to the White bases rows; the player's own Hide takes all.
+          const preset = !(group.id in state.overrides) && !(itemKey(group, code) in (state.itemOverrides ?? {}));
+          if (tier === 'HIDE' && preset && group.opts && also.ethereal === undefined) also = { ...also, ethereal: false };
+          const look = tier === 'HIDE' ? null : entryLook(state, group, code, tier);
+          const tint = tier === 'HIDE' ? undefined : group.look;
+          const key = tier + JSON.stringify(also ?? {}) + JSON.stringify(look) + tint;
+          if (!byTier.has(key)) byTier.set(key, { tier, also, look, tint, codes: [] });
           byTier.get(key).codes.push(code);
         }
       } else {
-        emit(rules, tierOf(group, state), `${category.label}: ${group.label}`, group.when, state, styles, entryLook(state, group));
+        flush(); // rows above a condition row stay above it
+        emit(rules, tierOf(group, state), `${category.label}: ${group.label}`, group.when, state, styles, entryLook(state, group, undefined, tierOf(group, state)), group.look);
       }
     }
-    for (const { tier, also, look, codes } of byTier.values()) {
-      for (const part of chunk([...new Set(codes)], MAX_VALUES)) {
-        emit(rules, tier, `${category.label}: ${tierName(tier)}${look ? ' · own look' : ''}`, { code: part.length === 1 ? part[0] : part, ...also }, state, styles, look);
-      }
-    }
+    flush();
   }
 
   const filter = { version: 3, rules };
