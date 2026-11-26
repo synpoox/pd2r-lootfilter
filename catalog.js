@@ -33,15 +33,15 @@ export const LEVELS = [
   },
   {
     name: 'Very strict', tag: 'Heavy', gold: 10000, who: 'Mapping and boss farming with a finished build.',
-    text: 'Also hides small rejuvenation potions, magic large charms, plain elite and ethereal exceptional bases, other elite uniques, uniques and set items rated one star or less and gold under 10,000.',
+    text: 'Also hides small rejuvenation potions, magic large charms, super healing and mana potions, plain elite and ethereal exceptional bases, other elite uniques, uniques and set items rated one star or less and gold under 10,000.',
   },
   {
     name: 'Ultra strict', tag: 'Very heavy', gold: 10000, who: 'Fast map farming, where only a good drop is worth the stop.',
-    text: 'Also hides flawless gems except skulls, magic circlets, rare rings, superior and socketed elite bases, most runeword weapon, class item, torso and shield bases (ethereal ones still show), and two-star uniques and set items.',
+    text: 'Also hides runes below Lem, flawless gems except skulls, magic circlets, rare rings, superior and socketed elite bases, most runeword weapon, class item, torso and shield bases (ethereal ones still show), and two-star uniques and set items.',
   },
   {
     name: 'Endgame', tag: 'Valuables only', gold: 10000, who: 'High-tier maps and ubers, where screens fill with loot.',
-    text: 'Mostly valuables stay. Also hides runes El to Lum, perfect gems, flawless skulls, rare elite gear, set rings and amulets, and elite helm and paladin shield runeword bases. Full rejuvenation potions, super healing and mana potions and every map, orb and uber piece always show.',
+    text: 'Mostly valuables stay. Also hides perfect gems, flawless skulls, rare elite gear, set rings and amulets, and elite helm and paladin shield runeword bases. Full rejuvenation potions and every map, orb and uber piece always show.',
   },
 ];
 
@@ -49,7 +49,7 @@ export const LEVELS = [
 export const upgradeLevel = raw => (raw.v === 2 ? raw.level : [0, 1, 3, 4, 6][raw.level]);
 
 // Rows split off since five levels: a choice made on the old row carries to the new one.
-const SPLIT = [['rare-jewelry', 'rare-ring'], ['magic-jewelry', 'magic-ring'], ['gem-perfect', 'gem-skull'], ['gem-flawless', 'gem-skl'], ['runes-lmid', 'runes-kofal']];
+const SPLIT = [['rare-jewelry', 'rare-ring'], ['magic-jewelry', 'magic-ring'], ['gem-perfect', 'gem-skull'], ['gem-flawless', 'gem-skl']];
 export function upgradeRows(raw, rows = {}) {
   const out = { ...rows };
   if (raw.v !== 2) for (const [from, to] of SPLIT) if (from in out) out[to] = out[from];
@@ -86,10 +86,9 @@ const RUNE_BANDS = [
   ['runes-high', 'High runes', 28, 33, 'S', {}],
   ['runes-upper', 'Upper mid runes', 23, 27, 'A', {}],
   ['runes-mid', 'Mid runes', 20, 22, 'N', {}],
-  ['runes-kofal', 'Ko and Fal runes', 18, 19, 'B', { 5: 'SHOW' }],
-  ['runes-lmid', 'Lower mid runes', 15, 17, 'B', { 5: 'SHOW', 6: 'HIDE' }],
-  ['runes-low', 'Low runes', 9, 14, 'SHOW', { 6: 'HIDE' }],
-  ['runes-start', 'Starter runes', 1, 8, 'SHOW', { 6: 'HIDE' }],
+  ['runes-lmid', 'Lower mid runes', 15, 19, 'B', { 5: 'HIDE' }],
+  ['runes-low', 'Low runes', 9, 14, 'SHOW', { 5: 'HIDE' }],
+  ['runes-start', 'Starter runes', 1, 8, 'SHOW', { 5: 'HIDE' }],
 ];
 
 const gem = (q, codes) => codes.map(c => q + c);
@@ -100,13 +99,17 @@ export function buildCatalog(data) {
   const codes = (id, label, list, t, s = {}, look = 'normal') => ({ id, label, codes: list, t, s, look });
   const when = (id, label, conditions, t, s = {}, look = 'normal', sample) => ({ id, label, when: conditions, t, s, look, sample });
   const mapsOf = type => Object.keys(data.misc).filter(c => data.misc[c].t === type);
-  const sample = (list, tier) => (list[tier] ?? [])[0];
-  // One rarity on the bases with a given value rating.
-  const rated = (id, label, list, rarity, t, s, keep = () => true) => {
-    const code = list.split(' ').filter(keep);
-    return when(id, label, { code, rarity }, t, s, rarity, name(code[0]));
-  };
+  // Every map is Notable; `own` is the row's built-in look, under the player's own.
+  const maps = (type, label) => ({ ...codes(type, label, mapsOf(type), 'N'), own: { sound: 'Filter04' } });
+  // One rarity on a list of bases: one item per base, named after the uniques or set items on it.
+  const rated = (id, label, list, rarity, t, s) => ({ ...codes(id, label, list, t, s, rarity), rarity });
+  const stars = (list, keep = () => true) => list.split(' ').filter(keep);
   const belowElite = c => data.bases[c]?.tier !== 'elite';
+  // Bases carrying a unique (or set item) that none of the `taken` lists covers.
+  const rest = (names, taken, keep = () => true) => {
+    const used = new Set(taken.flatMap(l => l.split(' ')));
+    return Object.keys(names).filter(c => data.bases[c] && keep(c) && !used.has(c)); // rings, charms and the like have their own rows
+  };
   // Runeword bases: by default white or superior, with at least the sockets the usual runewords need.
   // Players can change rarity, socket range and ethereal per row (compile.js alsoOf). Other bases fall through to White bases.
   const taken = new Set();
@@ -117,7 +120,7 @@ export function buildCatalog(data) {
   const family = (id, label, types, sockets, t, s) => base(id, label,
     Object.keys(data.bases).filter(c => data.bases[c].tier === 'elite' && types.includes(data.bases[c].t) && !taken.has(c)), sockets, t, s);
 
-  return [
+  const categories = [
     {
       id: 'runes', label: 'Runes', blurb: 'Runes in bands from Zod down to El. Expand a band to tier single runes.',
       groups: RUNE_BANDS.map(([id, label, from, to, t, s]) => {
@@ -161,9 +164,9 @@ export function buildCatalog(data) {
     {
       id: 'maps', label: 'Maps', blurb: 'Map drops by tier. Rarity does not change these rows.',
       groups: [
-        codes('t3m', 'Tier 3 maps', mapsOf('t3m'), 'A'),
-        codes('t2m', 'Tier 2 maps', mapsOf('t2m'), 'N'),
-        codes('t1m', 'Tier 1 maps', mapsOf('t1m'), 'B'),
+        maps('t3m', 'Tier 3 maps'),
+        maps('t2m', 'Tier 2 maps'),
+        maps('t1m', 'Tier 1 maps'),
       ],
     },
     {
@@ -204,23 +207,25 @@ export function buildCatalog(data) {
     {
       id: 'uniques', label: 'Uniques & sets', blurb: 'Equipment by the value of the best item on its base. A filter cannot tell two uniques on the same base apart.',
       groups: [
-        // First match wins: two stars and up, then every other elite unique, then the lower ratings.
-        rated('u-4', 'Four-star uniques', UNIQUE_STARS['4'], 'unique', 'S'),
-        rated('u-3', 'Three-star uniques', UNIQUE_STARS['3'], 'unique', 'A'),
-        rated('u-2', 'Two-star uniques', UNIQUE_STARS['2'], 'unique', 'N', { 4: 'B', 5: 'HIDE' }),
-        when('u-elite', 'Other elite uniques', { rarity: 'unique', tier: 'elite' }, 'B', { 4: 'HIDE' }, 'unique', sample(data.uniques, 'elite')),
-        rated('u-1', 'One-star uniques', UNIQUE_STARS['1'], 'unique', 'B', { 4: 'HIDE' }, belowElite),
-        rated('u-0', 'Zero-star uniques', UNIQUE_STARS['0'], 'unique', 'B', { 4: 'HIDE' }, belowElite),
-        rated('u-none', 'Below zero-star uniques', UNIQUE_STARS.none, 'unique', 'SHOW', { 3: 'HIDE' }, belowElite),
-        rated('u-unrated', 'Unrated uniques', UNIQUE_STARS.unrated, 'unique', 'SHOW', { 2: 'HIDE' }, belowElite),
-        when('u-other', 'Other uniques', { rarity: 'unique' }, 'B', {}, 'unique', 'Unique item'),
-        rated('s-4', 'Four-star set items', SET_STARS['4'], 'set', 'A'),
-        rated('s-3', 'Three-star set items', SET_STARS['3'], 'set', 'N'),
-        rated('s-2', 'Two-star set items', SET_STARS['2'], 'set', 'B', { 4: 'SHOW', 5: 'HIDE' }),
-        rated('s-1', 'One-star set items', SET_STARS['1'], 'set', 'SHOW', { 4: 'HIDE' }),
-        rated('s-0', 'Zero-star set items', SET_STARS['0'], 'set', 'SHOW', { 4: 'HIDE' }),
-        rated('s-unrated', 'Unrated set items', SET_STARS.unrated, 'set', 'SHOW', { 2: 'HIDE' }),
-        when('s-other', 'Other set items', { rarity: 'set' }, 'SHOW', {}, 'set', 'Set item'),
+        // No base is in two rows: four to two stars, then every other elite unique, then the lower ratings.
+        rated('u-4', 'Four-star uniques', stars(UNIQUE_STARS['4']), 'unique', 'S'),
+        rated('u-3', 'Three-star uniques', stars(UNIQUE_STARS['3']), 'unique', 'A'),
+        rated('u-2', 'Two-star uniques', stars(UNIQUE_STARS['2']), 'unique', 'N', { 4: 'B', 5: 'HIDE' }),
+        rated('u-elite', 'Other elite uniques', rest(data.uniques, [UNIQUE_STARS['4'], UNIQUE_STARS['3'], UNIQUE_STARS['2']], c => !belowElite(c)), 'unique', 'B', { 4: 'HIDE' }),
+        rated('u-1', 'One-star uniques', stars(UNIQUE_STARS['1'], belowElite), 'unique', 'B', { 4: 'HIDE' }),
+        rated('u-0', 'Zero-star uniques', stars(UNIQUE_STARS['0'], belowElite), 'unique', 'B', { 4: 'HIDE' }),
+        rated('u-none', 'Below zero-star uniques', stars(UNIQUE_STARS.none, belowElite), 'unique', 'SHOW', { 3: 'HIDE' }),
+        rated('u-unrated', 'Unrated uniques', stars(UNIQUE_STARS.unrated, belowElite), 'unique', 'SHOW', { 2: 'HIDE' }),
+        rated('u-new', 'Unlisted uniques', rest(data.uniques, Object.values(UNIQUE_STARS), belowElite), 'unique', 'B', {}),
+        when('u-other', 'Any other unique', { rarity: 'unique' }, 'B', {}, 'unique', 'Unique item'),
+        rated('s-4', 'Four-star set items', stars(SET_STARS['4']), 'set', 'A'),
+        rated('s-3', 'Three-star set items', stars(SET_STARS['3']), 'set', 'N'),
+        rated('s-2', 'Two-star set items', stars(SET_STARS['2']), 'set', 'B', { 4: 'SHOW', 5: 'HIDE' }),
+        rated('s-1', 'One-star set items', stars(SET_STARS['1']), 'set', 'SHOW', { 4: 'HIDE' }),
+        rated('s-0', 'Zero-star set items', stars(SET_STARS['0']), 'set', 'SHOW', { 4: 'HIDE' }),
+        rated('s-unrated', 'Unrated set items', stars(SET_STARS.unrated), 'set', 'SHOW', { 2: 'HIDE' }),
+        rated('s-new', 'Unlisted set items', rest(data.sets, Object.values(SET_STARS)), 'set', 'SHOW', {}),
+        when('s-other', 'Any other set item', { rarity: 'set' }, 'SHOW', {}, 'set', 'Set item'),
       ],
     },
     {
@@ -281,7 +286,7 @@ export function buildCatalog(data) {
       groups: [
         codes('rvl', name('rvl'), ['rvl'], 'SHOW', {}, 'potion-r'),
         codes('rvs', name('rvs'), ['rvs'], 'SHOW', { 4: 'HIDE' }, 'potion-r'),
-        codes('pot5', 'Super healing and mana potions', ['hp5', 'mp5'], 'SHOW', {}, 'potion-h'),
+        codes('pot5', 'Super healing and mana potions', ['hp5', 'mp5'], 'SHOW', { 4: 'HIDE' }, 'potion-h'),
         codes('pot4', 'Greater healing and mana potions', ['hp4', 'mp4'], 'SHOW', { 1: 'HIDE' }, 'potion-h'),
         codes('pot-low', 'Minor, light and plain healing and mana potions', ['hp1', 'hp2', 'hp3', 'mp1', 'mp2', 'mp3'], 'SHOW', { 1: 'HIDE' }, 'potion-h'),
         codes('pot-util', 'Stamina, antidote and thawing potions', ['vps', 'yps', 'wms'], 'SHOW', { 1: 'HIDE' }),
@@ -293,128 +298,123 @@ export function buildCatalog(data) {
       ],
     },
   ];
+  for (const c of categories) c.groups = c.groups.filter(g => g.codes?.length !== 0);
+  return categories;
 }
 
-// Colour presets for Looks & sounds. The FilterBlade styles use the apex/A/B/C currency tier label colours of
-// NeverSink's PoE filter styles (MIT, github.com/NeverSinkDev/NeverSink-Filter) for Chase/High Value/Notable/Good.
-// NeverSink gives every style the same minimap icons; ours give each style its own shapes in its own palette.
-// Player edits are layered on top of the chosen theme.
+// The game's own name colours. Looks keep them so a drop still reads as unique, set, rare and so on.
+export const VANILLA = { unique: '#c7b377', set: '#1eff00', rare: '#ffff64', magic: '#7878ff', crafted: '#ffa800', rune: '#ffa800', gray: '#9a9a9a', normal: '#ffffff', superior: '#ffffff', inferior: '#9a9a9a', gold: '#ffffff', 'potion-r': '#e070e0', 'potion-h': '#ffffff' };
+
+// Colour presets for Looks & sounds. A theme colour of 'item' is the item's own game colour and 'deep' a darker
+// shade of it (compile.js paint). The Resurrected themes are built on those; the FilterBlade styles use the
+// apex/A/B/C currency tier label colours of NeverSink's PoE filter styles (MIT, github.com/NeverSinkDev/NeverSink-Filter)
+// for Chase/High Value/Notable/Good. NeverSink gives every style the same minimap icons; ours give each style
+// its own shapes in its own palette. Player edits are layered on top of the chosen theme.
 const icon = (shape, size, fill, border = '#ffffff') => ({ shape, size, fill, border });
 const look = (border, background, sound, ic, text = '', bgAlpha = 0.85) => ({ text, border, background, bgAlpha, sound, icon: ic });
 const plain = look('', '', '', null);
+// Chase: pale box, dark item-colour text and border. High Value: item-colour box, pale text and border.
+// Notable: item-colour border on `dark`. Good: dim border. `light` and `dark` are what tell themes apart.
+const vanilla = (light, dark, sounds, icons) => ({
+  S: look('deep', light, 'Filter06', icons[0], 'deep', 0.95),
+  A: look(light, 'deep', sounds[0], icons[1], light, 0.95),
+  N: look('item', dark, sounds[1], icons[2]),
+  B: look('deep', '', '', icons[3]),
+  SHOW: plain,
+});
 
 export const THEMES = [
-  { id: 'resurrected', group: 'Resurrected', name: 'Resurrected', styles: {
-    S: look('#ff3c3c', '#5a0000', 'Filter06', icon('star', 16, '#ff4444'), '', 0.9),
-    A: look('#ff9100', '#2b1500', 'Filter05', icon('diamond', 12, '#ff9100')),
-    N: look('#ffd24a', '#1f1a08', 'Filter07', icon('kite', 10, '#ffd24a')),
-    B: look('#c9c1a0', '', '', icon('circle', 8, '#e6d278', '#000000')),
-    SHOW: plain } },
-  { id: 'sanctuary', group: 'Resurrected', name: 'Sanctuary Gold', styles: {
-    S: look('#ffe08a', '#3b2a05', 'Filter06', icon('star', 16, '#ffd24a')),
-    A: look('#e0a040', '#24170a', 'Filter04', icon('diamond', 12, '#e0a040')),
-    N: look('#b99555', '', 'Filter08', icon('kite', 10, '#b99555')),
-    B: look('#7d6a4a', '', '', icon('circle', 8, '#9d8a6a', '#000000')),
-    SHOW: plain } },
-  { id: 'neon', group: 'Resurrected', name: 'Neon', styles: {
-    S: look('#ff3df2', '#2a0028', 'Filter06', icon('star', 16, '#ff3df2')),
-    A: look('#00e5ff', '#002228', 'Filter05', icon('hexagon', 12, '#00e5ff')),
-    N: look('#7dff5a', '#0b1f06', 'Filter08', icon('diamond', 10, '#7dff5a')),
-    B: look('#8c7dff', '', '', icon('circle', 8, '#8c7dff', '#000000')),
-    SHOW: plain } },
-  { id: 'bloodmoon', group: 'Resurrected', name: 'Blood Moon', styles: {
-    S: look('#ffb347', '#4a0a00', 'Filter06', icon('bullseye', 16, '#ff5a1f')),
-    A: look('#e02424', '#2a0000', 'Filter05', icon('diamond', 12, '#e02424')),
-    N: look('#ff7a3d', '', 'Filter09', icon('triangle', 10, '#ff7a3d')),
-    B: look('#a04848', '', '', icon('circle', 8, '#a04848', '#000000')),
-    SHOW: plain } },
-  { id: 'frost', group: 'Resurrected', name: 'Frost', styles: {
-    S: look('#9af3ff', '#062a33', 'Filter06', icon('spark', 16, '#9af3ff')),
-    A: look('#4aa8ff', '#061a33', 'Filter04', icon('diamond', 12, '#4aa8ff')),
-    N: look('#4de0c0', '', 'Filter10', icon('hexagon', 10, '#4de0c0')),
-    B: look('#7f9ab5', '', '', icon('circle', 8, '#7f9ab5', '#000000')),
-    SHOW: plain } },
+  { id: 'resurrected', group: 'Resurrected', name: 'Resurrected', styles: vanilla('#ffffff', '#000000', ['Filter05', 'Filter07'],
+    [icon('star', 24, '#ff4444'), icon('diamond', 18, '#ff9100'), icon('kite', 10, '#ffd24a'), icon('circle', 8, '#e6d278', '#000000')]) },
+  { id: 'sanctuary', group: 'Resurrected', name: 'Sanctuary Gold', styles: vanilla('#ffeeb8', '#24170a', ['Filter04', 'Filter08'],
+    [icon('star', 24, '#ffd24a'), icon('diamond', 18, '#e0a040'), icon('kite', 10, '#b99555'), icon('circle', 8, '#9d8a6a', '#000000')]) },
+  { id: 'neon', group: 'Resurrected', name: 'Neon', styles: vanilla('#ffd9fb', '#1c0030', ['Filter05', 'Filter08'],
+    [icon('star', 24, '#ff3df2'), icon('hexagon', 18, '#00e5ff'), icon('diamond', 10, '#7dff5a'), icon('circle', 8, '#8c7dff', '#000000')]) },
+  { id: 'bloodmoon', group: 'Resurrected', name: 'Blood Moon', styles: vanilla('#ffd5c8', '#330000', ['Filter05', 'Filter09'],
+    [icon('bullseye', 24, '#ff5a1f'), icon('diamond', 18, '#e02424'), icon('triangle', 10, '#ff7a3d'), icon('circle', 8, '#a04848', '#000000')]) },
+  { id: 'frost', group: 'Resurrected', name: 'Frost', styles: vanilla('#d6f6ff', '#061a33', ['Filter04', 'Filter10'],
+    [icon('spark', 24, '#9af3ff'), icon('diamond', 18, '#4aa8ff'), icon('hexagon', 10, '#4de0c0'), icon('circle', 8, '#7f9ab5', '#000000')]) },
   { id: 'minimal', group: 'Resurrected', name: 'Minimal', styles: {
-    S: look('#ffffff', '', 'Filter06', icon('star', 14, '#ffffff', '#000000')),
-    A: look('#bdbdbd', '', 'Filter05', icon('circle', 10, '#bdbdbd', '#000000')),
-    N: look('#8a8a8a', '', '', icon('circle', 7, '#8a8a8a', '#000000')),
-    B: look('#555555', '', '', null),
+    S: look('item', '', 'Filter06', icon('star', 18, '#ffffff', '#000000')),
+    A: look('deep', '', 'Filter05', icon('circle', 13, '#bdbdbd', '#000000')),
+    N: look('deep', '', '', icon('circle', 7, '#8a8a8a', '#000000')),
+    B: look('', '', '', null),
     SHOW: plain } },
   { id: 'fb-classic', name: 'Classic', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 16, '#ff4040', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#f05a23', 'Filter05', icon('diamond', 14, '#f05a23', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 24, '#ff4040', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#f05a23', 'Filter05', icon('diamond', 19, '#f05a23', '#ffffff'), '#ffffff', 1.0),
     N: look('#000000', '#f05a23', 'Filter07', icon('triangle', 12, '#f99619', '#000000'), '#000000', 1.0),
     B: look('#000000', '#f99619', '', icon('circle', 9, '#ffffff', '#000000'), '#000000', 1.0),
     SHOW: plain } },
   { id: 'fb-abyss', name: 'Abyss', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('bullseye', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ff0000', '#280005', 'Filter05', icon('hexagon', 14, '#ff4040', '#ffffff'), '#ff0000', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('bullseye', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ff0000', '#280005', 'Filter05', icon('hexagon', 19, '#ff4040', '#ffffff'), '#ff0000', 1.0),
     N: look('#90e538', '#002905', 'Filter07', icon('diamond', 12, '#90e538', '#000000'), '#90e538', 1.0),
     B: look('#90e538', '#141400', '', icon('circle', 9, '#6fae2a', '#000000'), '#90e538', 1.0),
     SHOW: plain } },
   { id: 'fb-alloy', name: 'Alloy', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#eab22b', 'Filter05', icon('square', 14, '#eab22b', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#eab22b', 'Filter05', icon('square', 19, '#eab22b', '#ffffff'), '#ffffff', 1.0),
     N: look('#000000', '#eab22b', 'Filter07', icon('diamond', 12, '#eab22b', '#000000'), '#000000', 1.0),
     B: look('#000000', '#c9c0bb', '', icon('circle', 9, '#c9c0bb', '#000000'), '#000000', 1.0),
     SHOW: plain } },
   { id: 'fb-azurite', name: 'Azurite', group: 'FilterBlade styles', styles: {
-    S: look('#0094ff', '#ffffff', 'Filter06', icon('spark', 16, '#0094ff', '#ffffff'), '#0094ff', 1.0),
-    A: look('#ffffff', '#0094ff', 'Filter05', icon('diamond', 14, '#4fb3ff', '#ffffff'), '#ffffff', 1.0),
+    S: look('#0094ff', '#ffffff', 'Filter06', icon('spark', 24, '#0094ff', '#ffffff'), '#0094ff', 1.0),
+    A: look('#ffffff', '#0094ff', 'Filter05', icon('diamond', 19, '#4fb3ff', '#ffffff'), '#ffffff', 1.0),
     N: look('#000000', '#82d6ff', 'Filter07', icon('kite', 12, '#82d6ff', '#000000'), '#000000', 1.0),
     B: look('#000000', '#82d6ff', '', icon('circle', 9, '#ffffff', '#000000'), '#000000', 1.0),
     SHOW: plain } },
   { id: 'fb-cobalt', name: 'Cobalt', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#b90078', 'Filter05', icon('hexagon', 14, '#e0189a', '#ffffff'), '#ffffff', 1),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#b90078', 'Filter05', icon('hexagon', 19, '#e0189a', '#ffffff'), '#ffffff', 1),
     N: look('#ffffff', '#821ebe', 'Filter07', icon('diamond', 12, '#9b3ad8', '#000000'), '#ffffff', 1),
     B: look('#ffffff', '#3246be', '', icon('circle', 9, '#4a63e0', '#000000'), '#ffffff', 1),
     SHOW: plain } },
   { id: 'fb-crimson', name: 'Crimson', group: 'FilterBlade styles', styles: {
-    S: look('#d71414', '#ffffff', 'Filter06', icon('bullseye', 16, '#ff3030', '#ffffff'), '#d71414', 1.0),
-    A: look('#ffffff', '#d71414', 'Filter05', icon('diamond', 14, '#ff4b4b', '#ffffff'), '#ffffff', 1.0),
+    S: look('#d71414', '#ffffff', 'Filter06', icon('bullseye', 24, '#ff3030', '#ffffff'), '#d71414', 1.0),
+    A: look('#ffffff', '#d71414', 'Filter05', icon('diamond', 19, '#ff4b4b', '#ffffff'), '#ffffff', 1.0),
     N: look('#ffffff', '#970707', 'Filter07', icon('triangle', 12, '#c73030', '#000000'), '#ffffff', 1.0),
     B: look('#c7c7c7', '#970707', '', icon('circle', 9, '#c7c7c7', '#000000'), '#c7c7c7', 1.0),
     SHOW: plain } },
   { id: 'fb-elder', name: 'Elder', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffaa78', '#280c0c', 'Filter05', icon('hexagon', 14, '#ffaa78', '#ffffff'), '#ffaa78', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffaa78', '#280c0c', 'Filter05', icon('hexagon', 19, '#ffaa78', '#ffffff'), '#ffaa78', 1.0),
     N: look('#ffaa78', '#141400', 'Filter07', icon('kite', 12, '#ffaa78', '#000000'), '#ffaa78', 1.0),
     B: look('#f5c378', '#141400', '', icon('circle', 9, '#f5c378', '#000000'), '#f5c378', 1.0),
     SHOW: plain } },
   { id: 'fb-gaia', name: 'Gaia', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('spark', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#fa6e5a', 'Filter05', icon('diamond', 14, '#fa6e5a', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('spark', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#fa6e5a', 'Filter05', icon('diamond', 19, '#fa6e5a', '#ffffff'), '#ffffff', 1.0),
     N: look('#000000', '#fa6e5a', 'Filter07', icon('kite', 12, '#fa6e5a', '#000000'), '#000000', 1.0),
     B: look('#000000', '#e39b2c', '', icon('circle', 9, '#e39b2c', '#000000'), '#000000', 1.0),
     SHOW: plain } },
   { id: 'fb-lunaris', name: 'Lunaris', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#f05a23', 'Filter05', icon('chevron', 14, '#f05a23', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#f05a23', 'Filter05', icon('chevron', 19, '#f05a23', '#ffffff'), '#ffffff', 1.0),
     N: look('#ff6400', '#530e0e', 'Filter07', icon('triangle', 12, '#ff6400', '#000000'), '#ff6400', 1.0),
     B: look('#ffcf84', '#4c330c', '', icon('circle', 9, '#ffcf84', '#000000'), '#ffcf84', 1.0),
     SHOW: plain } },
   { id: 'fb-necros', name: 'Necros', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('cross', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#fcffff', '#d97f0a', 'Filter05', icon('diamond', 14, '#d97f0a', '#ffffff'), '#fcffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('cross', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#fcffff', '#d97f0a', 'Filter05', icon('diamond', 19, '#d97f0a', '#ffffff'), '#fcffff', 1.0),
     N: look('#fcffb4', '#d97f0a', 'Filter07', icon('kite', 12, '#fcffb4', '#000000'), '#fcffb4', 1.0),
     B: look('#fcffb4', '#928300', '', icon('circle', 9, '#c9b800', '#000000'), '#fcffb4', 1.0),
     SHOW: plain } },
   { id: 'fb-purple', name: 'Purple', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#f05a23', 'Filter05', icon('hexagon', 14, '#f05a23', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('star', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#f05a23', 'Filter05', icon('hexagon', 19, '#f05a23', '#ffffff'), '#ffffff', 1.0),
     N: look('#140028', '#f05a23', 'Filter07', icon('diamond', 12, '#f99619', '#000000'), '#140028', 1.0),
     B: look('#140028', '#f99619', '', icon('circle', 9, '#9b6bff', '#000000'), '#140028', 1.0),
     SHOW: plain } },
   { id: 'fb-vaal', name: 'Vaal', group: 'FilterBlade styles', styles: {
-    S: look('#ff0000', '#ffffff', 'Filter06', icon('bullseye', 16, '#ff2020', '#ffffff'), '#ff0000', 1.0),
-    A: look('#ffffff', '#be1e1e', 'Filter05', icon('triangleDown', 14, '#e03030', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ff0000', '#ffffff', 'Filter06', icon('bullseye', 24, '#ff2020', '#ffffff'), '#ff0000', 1.0),
+    A: look('#ffffff', '#be1e1e', 'Filter05', icon('triangleDown', 19, '#e03030', '#ffffff'), '#ffffff', 1.0),
     N: look('#000000', '#be1e1e', 'Filter07', icon('diamond', 12, '#ff5a3a', '#000000'), '#000000', 1.0),
     B: look('#000000', '#b44c3a', '', icon('circle', 9, '#b44c3a', '#000000'), '#000000', 1.0),
     SHOW: plain } },
   { id: 'fb-velvet', name: 'Velvet', group: 'FilterBlade styles', styles: {
-    S: look('#ea57df', '#ffffff', 'Filter06', icon('star', 16, '#ea57df', '#ffffff'), '#ea57df', 1.0),
-    A: look('#ffffff', '#ea57df', 'Filter05', icon('kite', 14, '#ea57df', '#ffffff'), '#ffffff', 1.0),
+    S: look('#ea57df', '#ffffff', 'Filter06', icon('star', 24, '#ea57df', '#ffffff'), '#ea57df', 1.0),
+    A: look('#ffffff', '#ea57df', 'Filter05', icon('kite', 19, '#ea57df', '#ffffff'), '#ffffff', 1.0),
     N: look('#000000', '#ea57df', 'Filter07', icon('diamond', 12, '#c865f2', '#000000'), '#000000', 1.0),
     B: look('#000000', '#c865f2', '', icon('circle', 9, '#ffffff', '#000000'), '#000000', 1.0),
     SHOW: plain } },

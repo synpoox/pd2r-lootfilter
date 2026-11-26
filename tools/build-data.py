@@ -58,14 +58,15 @@ types = {r["Code"]: {"n": r["ItemType"], "p": [x for x in (r["Equiv1"], r["Equiv
          for r in rows("itemtypes.txt") if r["Code"]}
 
 
-def samples(table, base_col):
+def names_by_base(table, base_col):
     found = {}
     for r in rows(table):
         name, base = clean(strings.get(r["index"], r["index"])), r[base_col].strip()
-        if not name or r.get("spawnable", "1") == "0" or base not in bases:
+        if not name or r.get("spawnable", "1") == "0" or (base not in bases and base not in misc):
             continue
-        found.setdefault(bases[base]["tier"], []).append(name)
-    return {k: v[:12] for k, v in found.items()}
+        if name not in found.setdefault(base, []):
+            found[base].append(name)
+    return found
 
 
 commit = subprocess.run(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
@@ -75,8 +76,8 @@ result = {
     "bases": bases,
     "misc": misc,
     "types": types,
-    "uniques": samples("uniqueitems.txt", "code"),
-    "sets": samples("setitems.txt", "item"),
+    "uniques": names_by_base("uniqueitems.txt", "code"),
+    "sets": names_by_base("setitems.txt", "item"),
 }
 assert len(bases) > 300 and len(misc) > 250 and "r33" in misc, "PD2R tables look incomplete"
 out.parent.mkdir(parents=True, exist_ok=True)

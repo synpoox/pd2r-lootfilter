@@ -34,7 +34,7 @@ Firefox and Safari do not offer folder access, so they get Download and the manu
 
 ## Themes
 
-The Resurrected themes are our own. The FilterBlade styles copy the apex, A, B and C currency tier label colours of [NeverSink's PoE filter styles](https://github.com/NeverSinkDev/NeverSink-Filter) (MIT), which FilterBlade uses, onto Chase, High Value, Notable and Good. NeverSink uses the same minimap icons in every style; ours give each style its own icon shapes in its own palette. Drop sounds stay the PD2R ones; Chase plays Filter06 in every theme.
+The Resurrected themes are our own and keep the game's name colours (unique brown, set green, rare yellow and so on): Chase is a pale box with dark text, High Value a box in the item's colour, Notable a border in it. Themes differ in their pale and dark shades, sounds and minimap icons. The FilterBlade styles copy the apex, A, B and C currency tier label colours of [NeverSink's PoE filter styles](https://github.com/NeverSinkDev/NeverSink-Filter) (MIT), which FilterBlade uses, onto Chase, High Value, Notable and Good. NeverSink uses the same minimap icons in every style; ours give each style its own icon shapes in its own palette. Drop sounds stay the PD2R ones; Chase plays Filter06 in every theme.
 
 Runeword & crafting bases match elite white or superior bases only when they have the sockets the usual runewords need (for example Phase Blade 5+, Monarch 4+); fewer sockets fall through to the White bases rows. Each row can change rarity (normal, superior or both), socket range and ethereal.
 
@@ -49,7 +49,7 @@ The check confirms every code and item type in `catalog.js` exists in the mod da
 
 ## Limits
 
-- Pyre matches a base, rarity and tier, not a specific unique or set item. Two uniques on the same base cannot be told apart.
+- Pyre matches a base, rarity and tier, not a specific unique or set item. Two uniques on the same base cannot be told apart, so they share one toggle, labelled with both names.
 - Stat conditions (`stats`) and item level are not offered yet.
 - Settings live in the visitor's browser (`localStorage`) and in share links. There are no accounts.
 
