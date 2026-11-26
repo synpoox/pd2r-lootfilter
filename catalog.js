@@ -29,28 +29,37 @@ export const LEVELS = [
   },
   {
     name: 'Strict', tag: 'Medium', gold: 5000, who: 'Hell difficulty and early maps, once your gear is mostly set.',
-    text: 'Also hides magic amulets, magic elite gear, rare exceptional gear, socketed exceptional bases, uniques rated below zero stars, elite dagger, javelin and throwing runeword bases and gold under 5,000.',
+    text: 'Also hides magic amulets, magic elite gear, rare exceptional gear, socketed exceptional bases, non-elite uniques rated below zero stars and gold under 5,000.',
   },
   {
     name: 'Very strict', tag: 'Heavy', gold: 10000, who: 'Mapping and boss farming with a finished build.',
-    text: 'Also hides small rejuvenation potions, magic large charms, plain elite and ethereal exceptional bases, most runeword weapon, class item, torso and shield bases, other elite uniques, uniques and set items rated one star or less and gold under 10,000.',
+    text: 'Also hides small rejuvenation potions, magic large charms, plain elite and ethereal exceptional bases, other elite uniques, uniques and set items rated one star or less and gold under 10,000.',
   },
   {
     name: 'Ultra strict', tag: 'Very heavy', gold: 10000, who: 'Fast map farming, where only a good drop is worth the stop.',
-    text: 'Also hides flawless gems, magic circlets, rare rings, superior and socketed elite bases, and two-star uniques and set items.',
+    text: 'Also hides flawless gems except skulls, magic circlets, rare rings, superior and socketed elite bases, most runeword weapon, class item, torso and shield bases (ethereal ones still show), and two-star uniques and set items.',
   },
   {
     name: 'Endgame', tag: 'Valuables only', gold: 10000, who: 'High-tier maps and ubers, where screens fill with loot.',
-    text: 'Only items with real trade or crafting value stay. Also hides runes El to Lum, perfect gems, rare elite gear, set rings and amulets, and elite helm and paladin shield runeword bases. Super and full rejuvenation potions and every map, orb and uber piece always show.',
+    text: 'Mostly valuables stay. Also hides runes El to Lum, perfect gems, flawless skulls, rare elite gear, set rings and amulets, and elite helm and paladin shield runeword bases. Full rejuvenation potions, super healing and mana potions and every map, orb and uber piece always show.',
   },
 ];
 
 // Saved settings keep the level's position. Before v2 there were five: Semi strict and Ultra strict moved the later ones.
 export const upgradeLevel = raw => (raw.v === 2 ? raw.level : [0, 1, 3, 4, 6][raw.level]);
 
+// Rows split off since five levels: a choice made on the old row carries to the new one.
+const SPLIT = [['rare-jewelry', 'rare-ring'], ['magic-jewelry', 'magic-ring'], ['gem-perfect', 'gem-skull'], ['gem-flawless', 'gem-skl'], ['runes-lmid', 'runes-kofal']];
+export function upgradeRows(raw, rows = {}) {
+  const out = { ...rows };
+  if (raw.v !== 2) for (const [from, to] of SPLIT) if (from in out) out[to] = out[from];
+  return out;
+}
+
 // Value ratings by base code from HiimFilter's builderfilter/data/unique-set-tiers.json (market-based stars):
 // a base takes the best rating of any unique (or set item) on it, ethereal or not, as one Pyre row covers both.
-// shortcut: copied snapshot, re-copy when market values drift or the mod adds items; unlisted bases always show.
+// shortcut: copied snapshot, re-copy when market values drift or the mod adds items; unlisted bases are never hidden below Very strict
+// (elite uniques) or at all (the rest), since they may be items Hiim does not know.
 const UNIQUE_STARS = {
   '4': '6lw 6ws 7b7 7b8 7bk 7bl 7cr 7gd 7gm 7gw 7p7 7s8 7sr 7wa 7wc 7wh 7ws 8ls 8ws 9ls aar am5 amd ame amf aqv3 ci3 drd dre obe pa9 pab pac paf uar uh9 uhc uhg uhm ulc umc umg urn usk utg utp uts uul uvg xh9 xhb xow xtb xtg xvb ztb',
   '3': '6bs 7gi 7lw 7pa 7tw 7xf 8mx 8rx 9gm 9la 9s8 bae ci2 cqv3 dr6 dra drc ned nef neg obf pae tbt tgl uap ulm umb ung uow upl urg urs ush uuc uui uvc xea xhm xhn xlb xlt xmb xsh zhb zlb zvb',
@@ -93,10 +102,11 @@ export function buildCatalog(data) {
   const mapsOf = type => Object.keys(data.misc).filter(c => data.misc[c].t === type);
   const sample = (list, tier) => (list[tier] ?? [])[0];
   // One rarity on the bases with a given value rating.
-  const rated = (id, label, list, rarity, t, s) => {
-    const code = list.split(' ');
+  const rated = (id, label, list, rarity, t, s, keep = () => true) => {
+    const code = list.split(' ').filter(keep);
     return when(id, label, { code, rarity }, t, s, rarity, name(code[0]));
   };
+  const belowElite = c => data.bases[c]?.tier !== 'elite';
   // Runeword bases: by default white or superior, with at least the sockets the usual runewords need.
   // Players can change rarity, socket range and ethereal per row (compile.js alsoOf). Other bases fall through to White bases.
   const taken = new Set();
@@ -161,7 +171,8 @@ export function buildCatalog(data) {
       groups: [
         codes('gem-perfect', 'Perfect gems', gem('gp', GEM_COLORS), 'B', { 6: 'HIDE' }),
         codes('gem-skull', name('skz'), ['skz'], 'B'),
-        codes('gem-flawless', 'Flawless gems', [...['gzv', 'gly', 'glb', 'glg', 'glr', 'glw'], 'skl'], 'SHOW', { 5: 'HIDE' }),
+        codes('gem-flawless', 'Flawless gems', ['gzv', 'gly', 'glb', 'glg', 'glr', 'glw'], 'SHOW', { 5: 'HIDE' }),
+        codes('gem-skl', name('skl'), ['skl'], 'SHOW', { 6: 'HIDE' }),
         codes('gem-normal', 'Gems', [...gem('gs', GEM_COLORS), 'sku'], 'SHOW', { 1: 'HIDE' }),
         codes('gem-flawed', 'Flawed gems', [...gem('gf', GEM_COLORS), 'skf'], 'SHOW', { 1: 'HIDE' }),
         codes('gem-chipped', 'Chipped gems', [...gem('gc', GEM_COLORS), 'skc'], 'SHOW', { 1: 'HIDE' }),
@@ -198,10 +209,10 @@ export function buildCatalog(data) {
         rated('u-3', 'Three-star uniques', UNIQUE_STARS['3'], 'unique', 'A'),
         rated('u-2', 'Two-star uniques', UNIQUE_STARS['2'], 'unique', 'N', { 4: 'B', 5: 'HIDE' }),
         when('u-elite', 'Other elite uniques', { rarity: 'unique', tier: 'elite' }, 'B', { 4: 'HIDE' }, 'unique', sample(data.uniques, 'elite')),
-        rated('u-1', 'One-star uniques', UNIQUE_STARS['1'], 'unique', 'B', { 4: 'HIDE' }),
-        rated('u-0', 'Zero-star uniques', UNIQUE_STARS['0'], 'unique', 'B', { 4: 'HIDE' }),
-        rated('u-none', 'Below zero-star uniques', UNIQUE_STARS.none, 'unique', 'SHOW', { 3: 'HIDE' }),
-        rated('u-unrated', 'Unrated uniques', UNIQUE_STARS.unrated, 'unique', 'SHOW', { 2: 'HIDE' }),
+        rated('u-1', 'One-star uniques', UNIQUE_STARS['1'], 'unique', 'B', { 4: 'HIDE' }, belowElite),
+        rated('u-0', 'Zero-star uniques', UNIQUE_STARS['0'], 'unique', 'B', { 4: 'HIDE' }, belowElite),
+        rated('u-none', 'Below zero-star uniques', UNIQUE_STARS.none, 'unique', 'SHOW', { 3: 'HIDE' }, belowElite),
+        rated('u-unrated', 'Unrated uniques', UNIQUE_STARS.unrated, 'unique', 'SHOW', { 2: 'HIDE' }, belowElite),
         when('u-other', 'Other uniques', { rarity: 'unique' }, 'B', {}, 'unique', 'Unique item'),
         rated('s-4', 'Four-star set items', SET_STARS['4'], 'set', 'A'),
         rated('s-3', 'Three-star set items', SET_STARS['3'], 'set', 'N'),
@@ -224,17 +235,17 @@ export function buildCatalog(data) {
         family('rw-pole', 'Elite polearms and scythes', ['pole', 'sc9'], 4, 'A', { 5: 'N', 6: 'B' }),
         base('rw-diadem', 'Diadems and tiaras', ['ci3', 'ci2'], 2, 'A'),
         family('rw-helm', 'Elite helms', ['helm'], 2, 'N', { 4: 'B', 6: 'HIDE' }),
-        family('rw-tors', 'Other elite body armours', ['tors'], 3, 'N', { 4: 'HIDE' }),
-        family('rw-shield', 'Other elite shields', ['shie'], 2, 'N', { 4: 'HIDE' }),
-        family('rw-class', 'Elite class items: orbs, heads, pelts, barbarian helms, grimoires', ['orb', 'head', 'pelt', 'phlm', 'grim'], 2, 'N', { 2: 'B', 4: 'HIDE' }),
-        family('rw-sword', 'Elite swords', ['swor', '2hcs'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-axe', 'Elite axes', ['axe'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-bow', 'Elite bows and crossbows', ['bow', 'xbow', 'abow'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-spear', 'Elite spears', ['spea', 'aspe'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-blunt', 'Elite maces, hammers and clubs', ['mace', 'hamm', 'club'], 3, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-caster', 'Elite staves, wands and scepters', ['staf', 'wand', 'scep'], 2, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-claw', 'Elite claws', ['h2h2'], 3, 'N', { 3: 'B', 4: 'HIDE' }),
-        family('rw-small', 'Elite daggers, javelins and throwing weapons', ['knif', 'tkni', 'taxe', 'jave', 'ajav'], 2, 'B', { 2: 'SHOW', 3: 'HIDE' }),
+        family('rw-tors', 'Other elite body armours', ['tors'], 3, 'N', { 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-shield', 'Other elite shields', ['shie'], 2, 'N', { 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-class', 'Elite class items: orbs, heads, pelts, barbarian helms, grimoires', ['orb', 'head', 'pelt', 'phlm', 'grim'], 2, 'N', { 2: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-sword', 'Elite swords', ['swor', '2hcs'], 4, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-axe', 'Elite axes', ['axe'], 4, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-bow', 'Elite bows and crossbows', ['bow', 'xbow', 'abow'], 4, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-spear', 'Elite spears', ['spea', 'aspe'], 4, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-blunt', 'Elite maces, hammers and clubs', ['mace', 'hamm', 'club'], 3, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-caster', 'Elite staves, wands and scepters', ['staf', 'wand', 'scep'], 2, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-claw', 'Elite claws', ['h2h2'], 3, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }),
+        family('rw-small', 'Elite daggers, javelins and throwing weapons', ['knif', 'tkni', 'taxe', 'jave', 'ajav'], 2, 'B', { 2: 'SHOW', 5: 'HIDE' }),
         when('craft-magic', 'Magic elite gloves, belts and boots', { itemType: ['glov', 'belt', 'boot'], rarity: 'magic', tier: 'elite' }, 'N', {}, 'magic', 'Vampirebone Gloves'),
       ],
     },

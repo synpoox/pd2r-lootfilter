@@ -2,7 +2,7 @@
 // Run: node tools/check.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { buildCatalog, upgradeLevel, LEVELS, THEMES } from '../catalog.js';
+import { buildCatalog, upgradeLevel, upgradeRows, LEVELS, THEMES } from '../catalog.js';
 import { compile, presetTier, evaluate, labelName, labelProblem } from '../compile.js';
 
 const data = JSON.parse(readFileSync(new URL('../data/pd2r-items.json', import.meta.url), 'utf8'));
@@ -151,6 +151,19 @@ for (const [code, rarity] of [['uap', 'unique'], ['r18', 'normal'], ['hp5', 'nor
   assert.equal(sim(endgame, { code, rarity }).visible, true, `${code} stays at Endgame`);
 }
 assert.equal(sim(endgame, { code: 'r17', rarity: 'normal' }).visible, false);
+assert.deepEqual(upgradeRows({}, { 'rare-jewelry': 'HIDE' }), { 'rare-jewelry': 'HIDE', 'rare-ring': 'HIDE' });
+assert.deepEqual(upgradeRows({ v: 2 }, { 'rare-jewelry': 'HIDE' }), { 'rare-jewelry': 'HIDE' });
+// A socketed base never hides while the same base with fewer sockets shows, and presets leave ethereal ones visible.
+for (const [level] of LEVELS.entries()) {
+  const f = compile(catalog, { ...base, level });
+  for (const code of Object.keys(data.bases).filter(c => data.bases[c].tier === 'elite')) {
+    const at = (sockets, ethereal) => sim(f, { code, rarity: 'normal', sockets, ethereal }).visible;
+    for (let n = 1; n <= 6; n++) {
+      if (at(1)) assert(at(n), `${code} with ${n} sockets hides before 1 socket at level ${level}`);
+      assert(at(n, true), `ethereal ${code} with ${n} sockets hides at level ${level}`);
+    }
+  }
+}
 
 // Worst case the app allows (200 picks, 3300 kept rules, every rarity and every item looked) stays under Pyre's 4096 rules.
 const allKinds = Object.fromEntries(['unique', 'set', 'rare', 'crafted', 'magic', 'base'].map(k => [k, Object.fromEntries(['S', 'A', 'N', 'B', 'SHOW'].map(t => [t, { sound: 'Filter01' }]))]));

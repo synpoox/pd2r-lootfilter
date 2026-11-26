@@ -1,4 +1,4 @@
-import { TIERS, LEVELS, THEMES, buildCatalog, upgradeLevel } from './catalog.js';
+import { TIERS, LEVELS, THEMES, buildCatalog, upgradeLevel, upgradeRows } from './catalog.js';
 import { BASE_RARITY, KINDS, STYLED, alsoOf, baseOpts, compile, effectiveStyles, entryLook, evaluate, goldOf, labelName, labelProblem, matches, merge, itemTierOf, kindsOf, presetTier, tierOf } from './compile.js';
 import * as game from './game-folder.js';
 
@@ -35,7 +35,7 @@ function sanitize(raw) {
   const level = upgradeLevel(raw);
   if (Number.isInteger(level) && level >= 0 && level < LEVELS.length) s.level = level;
   for (const [code, t] of Object.entries(raw.itemOverrides ?? {})) if (groupOfCode.has(code) && TIER_IDS.includes(t)) s.itemOverrides[code] = t;
-  for (const [id, t] of Object.entries(raw.overrides ?? {})) {
+  for (const [id, t] of Object.entries(upgradeRows(raw, raw.overrides))) {
     if (!TIER_IDS.includes(t)) continue;
     if (groupsById.has(id)) s.overrides[id] = t;
     // Runes and orbs used to have a row each, keyed by item code: keep those choices as item tiers.
@@ -57,7 +57,7 @@ function sanitize(raw) {
     const e = cleanEdits(raw.rarityEdits?.[k.id]);
     if (Object.keys(e).length) s.rarityEdits[k.id] = e;
   }
-  for (const [id, r] of Object.entries(raw.rowLooks ?? {})) { const e = cleanEdit(r); if (groupsById.has(id) && Object.keys(e).length) s.rowLooks[id] = e; }
+  for (const [id, r] of Object.entries(upgradeRows(raw, raw.rowLooks))) { const e = cleanEdit(r); if (groupsById.has(id) && Object.keys(e).length) s.rowLooks[id] = e; }
   for (const [code, r] of Object.entries(raw.itemLooks ?? {})) { const e = cleanEdit(r); if (groupOfCode.has(code) && Object.keys(e).length) s.itemLooks[code] = e; }
   for (const p of Array.isArray(raw.picks) ? raw.picks.slice(0, 200) : []) {
     const item = itemByCode(p?.code);

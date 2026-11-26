@@ -156,7 +156,10 @@ export function compile(catalog, state) {
       if (group.codes) {
         for (const code of group.codes) {
           const tier = itemTierOf(group, code, state);
-          const also = alsoOf(group, state);
+          let also = alsoOf(group, state);
+          // A level hiding a base row leaves ethereal ones to the White bases rows; the player's own Hide takes all.
+          const preset = !(group.id in state.overrides) && !(code in (state.itemOverrides ?? {}));
+          if (tier === 'HIDE' && preset && also && also.ethereal === undefined) also = { ...also, ethereal: false };
           const look = tier === 'HIDE' ? null : entryLook(state, group, code);
           const key = tier + JSON.stringify(also ?? {}) + JSON.stringify(look);
           if (!byTier.has(key)) byTier.set(key, { tier, also, look, codes: [] });
