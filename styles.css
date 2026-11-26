@@ -37,7 +37,7 @@ button,input,select{font:inherit;color:inherit}
 
 /* Strictness */
 .strictness{padding:26px clamp(16px,2.5vw,40px) 18px;border-bottom:1px solid var(--line-2)}
-.levels{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--line)}
+.levels{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0;border:1px solid var(--line)}
 .level{position:relative;text-align:left;cursor:pointer;background:var(--panel);border:0;border-right:1px solid var(--line);padding:14px 16px 16px;min-height:72px}
 .level:last-child{border-right:0}
 .level:hover{background:var(--panel-2)}

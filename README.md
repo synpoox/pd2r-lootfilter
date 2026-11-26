@@ -4,6 +4,8 @@ A standalone, buildless web app that builds a loot filter for **Project Diablo 2
 
 The idea follows the [D2R Reimagined filter builder v2](https://www.d2r-reimagined.com/loot-filterv2) and [FilterBlade](https://www.filterblade.xyz/): tiers, strictness presets, styles and sounds. No code from either is used. Item data comes from [pd2-resurrected](https://github.com/synpoox/pd2-resurrected), not Reimagined.
 
+The seven strictness levels follow what the standard filter of [HiimFilter](https://github.com/Maaaaaarrk/HiimFilter-PD2-Filter) hides at each of its levels, adapted to the conditions Pyre has. The star rating per unique and set base in `catalog.js` is copied from its `builderfilter/data/unique-set-tiers.json`. Gold amounts and ratings are snapshots for another PD2 economy, so treat them as a starting point.
+
 ## Run it locally
 
 Any static server works. On Windows, Python's built-in server sends `.js` as `text/plain`, which browsers refuse for modules; `.claude/launch.json` serves it with the right types on port 8765.
@@ -13,7 +15,7 @@ Any static server works. On Windows, Python's built-in server sends `.js` as `te
 | File | Purpose |
 | --- | --- |
 | `index.html`, `styles.css` | Page and launcher theme (tokens copied from `site/themes.css`). |
-| `catalog.js` | Tiers (Chase, High Value, Notable, Good, Show, Hide), strictness levels, categories, rows and colour themes. Rows run top to bottom; the first match wins. |
+| `catalog.js` | Tiers (Chase, High Value, Notable, Good, Show, Hide), strictness levels (modelled on HiimFilter's, with its unique and set value ratings), categories, rows and colour themes. Rows run top to bottom; the first match wins. |
 | `compile.js` | Turns settings into `filter.json`, and matches items against it the way the plugin does (used by the simulator). |
 | `app.js` | Interface, browser autosave, share links. |
 | `game-folder.js` | Connects to the player's game folder: lists, opens and saves filters in `mods\PD2Resurrected\d2rloader\config\filter\`. |

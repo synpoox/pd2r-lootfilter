@@ -2,7 +2,7 @@
 // Run: node tools/check.mjs
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { buildCatalog, LEVELS, THEMES } from '../catalog.js';
+import { buildCatalog, upgradeLevel, LEVELS, THEMES } from '../catalog.js';
 import { compile, presetTier, evaluate, labelName, labelProblem } from '../compile.js';
 
 const data = JSON.parse(readFileSync(new URL('../data/pd2r-items.json', import.meta.url), 'utf8'));
@@ -80,7 +80,7 @@ assert.equal(sim(split, { code: 'm04', rarity: 'normal' }).visible, true, 'rest 
 const regular = compile(catalog, { ...base, level: 1 });
 assert.equal(sim(regular, { code: 'r30', rarity: 'normal' }).rule.dropSound, 'Filter06', 'Ber is Chase');
 assert.equal(sim(regular, { code: 'ssd', rarity: 'inferior' }).visible, false, 'inferior hidden at Regular');
-assert.equal(sim(regular, { code: 'uap', rarity: 'unique' }).rule.ruleName, 'Uniques & sets: Elite uniques');
+assert.equal(sim(regular, { code: 'uap', rarity: 'unique' }).rule.ruleName, 'Uniques & sets: Three-star uniques');
 assert.equal(sim(regular, { code: 'uap', rarity: 'normal', sockets: 2 }).rule.ruleName, 'Runeword & crafting bases: Notable');
 assert.equal(sim(regular, { code: 'cm3', rarity: 'magic' }).rule.ruleName, 'Charms, jewels & jewelry: Magic grand charms', 'itemType follows parents');
 // Runeword bases need their sockets; fewer fall through to White bases.
@@ -96,17 +96,17 @@ assert.equal(sim(opts, { code: 'uit', rarity: 'superior' }).rule.ruleName, 'Rune
 assert.notEqual(sim(opts, { code: 'uit', rarity: 'normal', sockets: 4 }).rule.ruleName, 'Runeword & crafting bases: High Value', 'normal Monarch no longer counts');
 assert.notEqual(sim(opts, { code: 'uit', rarity: 'superior', ethereal: true }).rule.ruleName, 'Runeword & crafting bases: High Value', 'ethereal excluded');
 const exact = compile(catalog, { ...base, level: 1, baseOptions: { 'rw-monarch': { min: 4, max: 4 } } });
-assert.deepEqual(exact.rules.find(r => [].concat(r.show?.conditions.code ?? []).includes('uit')).show.conditions.sockets, { gte: 4, lte: 4 });
+assert.deepEqual(exact.rules.find(r => r.show?.ruleName.startsWith('Runeword') && [].concat(r.show?.conditions.code ?? []).includes('uit')).show.conditions.sockets, { gte: 4, lte: 4 });
 
 // Per-rarity looks: a rule covering two rarities splits only when one of them looks different.
-const ring = f => f.rules.filter(r => r.show?.ruleName === 'Charms, jewels & jewelry: Rare and crafted rings and amulets');
+const ring = f => f.rules.filter(r => r.show?.ruleName === 'Charms, jewels & jewelry: Rare amulets and crafted rings and amulets');
 assert.equal(ring(regular).length, 1);
 const byRarity = compile(catalog, { ...base, level: 1, rarityEdits: { crafted: { N: { border: '#00ff00' } }, magic: { N: { sound: 'Filter12' } } } });
 validate(byRarity);
 assert.deepEqual(ring(byRarity).map(r => [r.show.conditions.rarity, r.show.tooltip.borderColor]), [['rare', regular.rules.find(r => r.show?.ruleName === ring(regular)[0].show.ruleName).show.tooltip.borderColor], ['crafted', 'RGBA(0, 255, 0, 1)']]);
 assert.equal(sim(byRarity, { code: 'cm3', rarity: 'magic' }).rule.dropSound, 'Filter12', 'magic charms take the magic look');
 assert.equal(sim(byRarity, { code: 'r22', rarity: 'normal' }).rule.dropSound, sim(regular, { code: 'r22', rarity: 'normal' }).rule.dropSound, 'rules without rarity keep the tier look');
-assert.equal(sim(regular, { code: 'gld', rarity: 'normal' }).visible, true);
+assert.equal(sim(regular, { code: 'gld', rarity: 'normal', gold: 5000 }).visible, true);
 
 // Own looks: a row look, an item look on top of it, kept through a tier change, and stacked on a rarity edit.
 const own = compile(catalog, { ...base, level: 1, rowLooks: { 'runes-high': { sound: 'Filter01' } }, itemLooks: { r30: { text: '#00ff88' } } });
@@ -139,7 +139,18 @@ const goldy = compile(catalog, { ...base, level: 1, goldMin: 1000 });
 validate(goldy);
 assert.equal(sim(goldy, { code: 'gld', rarity: 'normal', gold: 999 }).visible, false, 'pile under the amount hides');
 assert.equal(sim(goldy, { code: 'gld', rarity: 'normal', gold: 1000 }).visible, true, 'pile at the amount shows');
-assert.equal(sim(regular, { code: 'gld', rarity: 'normal', gold: 5 }).visible, true, 'off by default');
+assert.equal(sim(regular, { code: 'gld', rarity: 'normal', gold: 999 }).visible, false, 'the level sets the gold amount');
+assert.equal(sim(compile(catalog, { ...base, level: 6, goldMin: 0 }), { code: 'gld', rarity: 'normal', gold: 5 }).visible, true, 'Off beats the level');
+
+// Levels: seven, saved five-level settings keep their name, and the valuables never hide.
+assert.deepEqual(LEVELS.map(l => l.name), ['Starter', 'Regular', 'Semi strict', 'Strict', 'Very strict', 'Ultra strict', 'Endgame']);
+assert.deepEqual([0, 1, 2, 3, 4].map(level => upgradeLevel({ level })), [0, 1, 3, 4, 6]);
+assert.equal(upgradeLevel({ v: 2, level: 5 }), 5);
+const endgame = compile(catalog, { ...base, level: 6 });
+for (const [code, rarity] of [['uap', 'unique'], ['r18', 'normal'], ['hp5', 'normal'], ['rvl', 'normal'], ['skz', 'normal']]) {
+  assert.equal(sim(endgame, { code, rarity }).visible, true, `${code} stays at Endgame`);
+}
+assert.equal(sim(endgame, { code: 'r17', rarity: 'normal' }).visible, false);
 
 // Worst case the app allows (200 picks, 3300 kept rules, every rarity and every item looked) stays under Pyre's 4096 rules.
 const allKinds = Object.fromEntries(['unique', 'set', 'rare', 'crafted', 'magic', 'base'].map(k => [k, Object.fromEntries(['S', 'A', 'N', 'B', 'SHOW'].map(t => [t, { sound: 'Filter01' }]))]));

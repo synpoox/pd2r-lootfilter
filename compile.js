@@ -1,6 +1,6 @@
 // Turns builder settings into a Pyre Loot Filter filter.json (schema v3, first matching rule wins),
 // and evaluates items against it the way the plugin does, for the simulator.
-import { TIERS, THEMES } from './catalog.js';
+import { TIERS, LEVELS, THEMES } from './catalog.js';
 
 const MAX_VALUES = 64; // Pyre rejects condition arrays longer than this
 export const STYLED = ['S', 'A', 'N', 'B', 'SHOW'];
@@ -10,6 +10,9 @@ export function presetTier(group, level) {
   for (const [from, t] of Object.entries(group.s)) if (level >= Number(from)) tier = t;
   return tier;
 }
+
+// Gold piles under this amount are hidden: the player's choice, else the level's.
+export const goldOf = state => state.goldMin ?? LEVELS[state.level].gold;
 
 // Extra conditions of a base row: its default options with the player's changes on top.
 export const BASE_RARITY = { both: ['normal', 'superior'], normal: 'normal', superior: 'superior' };
@@ -144,8 +147,8 @@ export function compile(catalog, state) {
   for (const category of catalog) {
     // Gold under the chosen amount: hidden before the Gold row shows the rest. Pyre reads a pile's amount as its quantity.
     const gold = category.groups.find(g => g.id === 'gold');
-    if (gold && state.goldMin > 0 && tierOf(gold, state) !== 'HIDE') {
-      rules.push({ hide: { ruleName: `${category.label}: Gold under ${state.goldMin}`, conditions: { code: 'gld', quantity: { lt: state.goldMin } } } });
+    if (gold && goldOf(state) > 0 && tierOf(gold, state) !== 'HIDE') {
+      rules.push({ hide: { ruleName: `${category.label}: Gold under ${goldOf(state)}`, conditions: { code: 'gld', quantity: { lt: goldOf(state) } } } });
     }
     // Code groups never overlap each other, so merge their items per tier (and extra conditions) to keep the file short.
     const byTier = new Map();

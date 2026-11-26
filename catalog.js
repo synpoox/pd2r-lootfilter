@@ -11,28 +11,63 @@ export const TIERS = [
   { id: 'HIDE', name: 'Hide', hint: 'No label on the ground. Hold Ctrl to pick it up anyway' },
 ];
 
+// Levels follow HiimFilter's standard Hiim.filter (github.com/Maaaaaarrk/HiimFilter-PD2-Filter), whose own
+// level numbers are about: Starter 1, Regular 3, Semi strict 4, Strict 5, Very strict 7, Ultra strict 8, Endgame 9.
+// `gold`: piles under this amount are hidden unless the player picks their own.
 export const LEVELS = [
   {
-    name: 'Starter', tag: 'Everything', who: 'A fresh character, Normal difficulty, or anyone who wants to see every drop.',
+    name: 'Starter', tag: 'Everything', gold: 0, who: 'A fresh character, Normal difficulty, or anyone who wants to see every drop.',
     text: 'Nothing is hidden. Valuable drops still get borders, sounds and minimap icons, so the good stuff stands out from the clutter. Use it while you still need potions, scrolls, ammo and any gear with stats.',
   },
   {
-    name: 'Regular', tag: 'Light cleanup', who: 'Most of Nightmare, and anyone farming early Hell.',
-    text: 'Removes items you almost never pick up once you have a belt of potions and a few upgrades: low potions, utility potions, ammo, chipped gems, inferior items, plain normal-tier bases and normal-tier magic gear. Every rune, charm, jewel and higher-tier item still shows.',
+    name: 'Regular', tag: 'Light cleanup', gold: 1000, who: 'Most of Nightmare, and anyone farming early Hell.',
+    text: 'Hides potions below super, utility potions, scrolls, keys, ammo, gems below flawless, inferior items, plain normal-tier bases, magic normal-tier gear, magic rings and gold piles under 1,000. Every rune, unique and set item still shows.',
   },
   {
-    name: 'Strict', tag: 'Medium', who: 'Hell difficulty and early maps, once your gear is mostly set.',
-    text: 'Also hides low runes (El to Ral), flawed gems, greater potions, scrolls, tomes, keys, magic exceptional gear, magic rings and amulets, plain exceptional bases and socketed normal-tier bases. Socketed elite and exceptional bases, ethereal bases, rares and all currency stay visible.',
+    name: 'Semi strict', tag: 'Moderate', gold: 1000, who: 'Settled into Hell, still gearing up.',
+    text: 'Also hides magic exceptional gear, rare normal-tier gear, plain exceptional and socketed normal-tier bases, and uniques and set items with no value rating.',
   },
   {
-    name: 'Very strict', tag: 'Heavy', who: 'Mapping and boss farming with a finished build.',
-    text: 'Also hides runes up to Dol, regular gems, super potions, plain elite bases, socketed exceptional bases, magic elite gear, rare normal-tier gear, large charms and magic circlets. You keep high runes, currency, maps, uber items, charms, jewels, uniques, sets and good bases.',
+    name: 'Strict', tag: 'Medium', gold: 5000, who: 'Hell difficulty and early maps, once your gear is mostly set.',
+    text: 'Also hides magic amulets, magic elite gear, rare exceptional gear, socketed exceptional bases, uniques rated below zero stars, elite dagger, javelin and throwing runeword bases and gold under 5,000.',
   },
   {
-    name: 'Endgame', tag: 'Valuables only', who: 'High-tier maps and ubers, where screens fill with loot.',
-    text: 'Only items with real trade or crafting value stay. Also hides mid runes up to Fal, flawless gems, small rejuvenation potions, superior elite bases, ethereal exceptional bases, rare exceptional gear and normal-tier set items. Full rejuvenation potions and gold always show.',
+    name: 'Very strict', tag: 'Heavy', gold: 10000, who: 'Mapping and boss farming with a finished build.',
+    text: 'Also hides small rejuvenation potions, magic large charms, plain elite and ethereal exceptional bases, most runeword weapon, class item, torso and shield bases, other elite uniques, uniques and set items rated one star or less and gold under 10,000.',
+  },
+  {
+    name: 'Ultra strict', tag: 'Very heavy', gold: 10000, who: 'Fast map farming, where only a good drop is worth the stop.',
+    text: 'Also hides flawless gems, magic circlets, rare rings, superior and socketed elite bases, and two-star uniques and set items.',
+  },
+  {
+    name: 'Endgame', tag: 'Valuables only', gold: 10000, who: 'High-tier maps and ubers, where screens fill with loot.',
+    text: 'Only items with real trade or crafting value stay. Also hides runes El to Lum, perfect gems, rare elite gear, set rings and amulets, and elite helm and paladin shield runeword bases. Super and full rejuvenation potions and every map, orb and uber piece always show.',
   },
 ];
+
+// Saved settings keep the level's position. Before v2 there were five: Semi strict and Ultra strict moved the later ones.
+export const upgradeLevel = raw => (raw.v === 2 ? raw.level : [0, 1, 3, 4, 6][raw.level]);
+
+// Value ratings by base code from HiimFilter's builderfilter/data/unique-set-tiers.json (market-based stars):
+// a base takes the best rating of any unique (or set item) on it, ethereal or not, as one Pyre row covers both.
+// shortcut: copied snapshot, re-copy when market values drift or the mod adds items; unlisted bases always show.
+const UNIQUE_STARS = {
+  '4': '6lw 6ws 7b7 7b8 7bk 7bl 7cr 7gd 7gm 7gw 7p7 7s8 7sr 7wa 7wc 7wh 7ws 8ls 8ws 9ls aar am5 amd ame amf aqv3 ci3 drd dre obe pa9 pab pac paf uar uh9 uhc uhg uhm ulc umc umg urn usk utg utp uts uul uvg xh9 xhb xow xtb xtg xvb ztb',
+  '3': '6bs 7gi 7lw 7pa 7tw 7xf 8mx 8rx 9gm 9la 9s8 bae ci2 cqv3 dr6 dra drc ned nef neg obf pae tbt tgl uap ulm umb ung uow upl urg urs ush uuc uui uvc xea xhm xhn xlb xlt xmb xsh zhb zlb zvb',
+  '2': '6cs 6rx 6sw 7bw 7fl 7gs 7ts 8hx 9bw 9di 9fc 9gw 9m9 9tw 9wc 9wn ama amb amc aqv2 ba6 ba7 baa bad baf cqv2 drb gsd kit ltp mbt nee oba obc obd tbl uhb uhl uit ulb uld ulg upk utu uvb xap xcl xhg xld xlg xmg xpl xth xtp xul xvg',
+  '1': '6l7 72a 7br 7bt 7dg 7di 7fb 7ls 7ta 7wb 7yw 8cs 8s8 9gd bac brs cap drf fhl gix hgl mgl nea vgl xar xkp xrn xui',
+  '0': '7m7 7vo 8cb 9kr kri lbb uml vbt xts',
+  'none': '7sm 8lb 8sw 9b9 9fl 9sr dgr lgl',
+  'unrated': 'cbw dr2 flb fld gma gth hbt mau stu wax wst',
+};
+const SET_STARS = {
+  '4': 'lbt',
+  '3': '7ws xmg',
+  '2': '6cs lgl ne9 stu tow uar ucl ulg utc vbt xap xar xhm',
+  '1': '7m7 7qr 9mt ci3 dr8 mbl oba paf uhm uld urn uth uul xh9 xlb xmb xrs xsk xul xvg',
+  '0': '7ma amc ba5 ci0 ult uts xhb xhg xtb xtg zhb zmb zvb',
+  'unrated': 'lbl vgl',
+};
 
 const range = (prefix, from, to, pad = 2) =>
   Array.from({ length: to - from + 1 }, (_, i) => prefix + String(from + i).padStart(pad, '0'));
@@ -42,9 +77,10 @@ const RUNE_BANDS = [
   ['runes-high', 'High runes', 28, 33, 'S', {}],
   ['runes-upper', 'Upper mid runes', 23, 27, 'A', {}],
   ['runes-mid', 'Mid runes', 20, 22, 'N', {}],
-  ['runes-lmid', 'Lower mid runes', 15, 19, 'B', { 4: 'HIDE' }],
-  ['runes-low', 'Low runes', 9, 14, 'SHOW', { 3: 'HIDE' }],
-  ['runes-start', 'Starter runes', 1, 8, 'SHOW', { 2: 'HIDE' }],
+  ['runes-kofal', 'Ko and Fal runes', 18, 19, 'B', { 5: 'SHOW' }],
+  ['runes-lmid', 'Lower mid runes', 15, 17, 'B', { 5: 'SHOW', 6: 'HIDE' }],
+  ['runes-low', 'Low runes', 9, 14, 'SHOW', { 6: 'HIDE' }],
+  ['runes-start', 'Starter runes', 1, 8, 'SHOW', { 6: 'HIDE' }],
 ];
 
 const gem = (q, codes) => codes.map(c => q + c);
@@ -56,6 +92,11 @@ export function buildCatalog(data) {
   const when = (id, label, conditions, t, s = {}, look = 'normal', sample) => ({ id, label, when: conditions, t, s, look, sample });
   const mapsOf = type => Object.keys(data.misc).filter(c => data.misc[c].t === type);
   const sample = (list, tier) => (list[tier] ?? [])[0];
+  // One rarity on the bases with a given value rating.
+  const rated = (id, label, list, rarity, t, s) => {
+    const code = list.split(' ');
+    return when(id, label, { code, rarity }, t, s, rarity, name(code[0]));
+  };
   // Runeword bases: by default white or superior, with at least the sockets the usual runewords need.
   // Players can change rarity, socket range and ethereal per row (compile.js alsoOf). Other bases fall through to White bases.
   const taken = new Set();
@@ -118,10 +159,11 @@ export function buildCatalog(data) {
     {
       id: 'gems', label: 'Gems', blurb: 'All seven gem colours by quality.',
       groups: [
-        codes('gem-perfect', 'Perfect gems', [...gem('gp', GEM_COLORS), 'skz'], 'B'),
-        codes('gem-flawless', 'Flawless gems', [...['gzv', 'gly', 'glb', 'glg', 'glr', 'glw'], 'skl'], 'SHOW', { 4: 'HIDE' }),
-        codes('gem-normal', 'Gems', [...gem('gs', GEM_COLORS), 'sku'], 'SHOW', { 3: 'HIDE' }),
-        codes('gem-flawed', 'Flawed gems', [...gem('gf', GEM_COLORS), 'skf'], 'SHOW', { 2: 'HIDE' }),
+        codes('gem-perfect', 'Perfect gems', gem('gp', GEM_COLORS), 'B', { 6: 'HIDE' }),
+        codes('gem-skull', name('skz'), ['skz'], 'B'),
+        codes('gem-flawless', 'Flawless gems', [...['gzv', 'gly', 'glb', 'glg', 'glr', 'glw'], 'skl'], 'SHOW', { 5: 'HIDE' }),
+        codes('gem-normal', 'Gems', [...gem('gs', GEM_COLORS), 'sku'], 'SHOW', { 1: 'HIDE' }),
+        codes('gem-flawed', 'Flawed gems', [...gem('gf', GEM_COLORS), 'skf'], 'SHOW', { 1: 'HIDE' }),
         codes('gem-chipped', 'Chipped gems', [...gem('gc', GEM_COLORS), 'skc'], 'SHOW', { 1: 'HIDE' }),
       ],
     },
@@ -134,28 +176,39 @@ export function buildCatalog(data) {
         when('cjw', 'Colossal jewels', { code: 'cjw' }, 'A', {}, 'unique', 'Colossal Jewel'),
         when('uniq-jewelry', 'Unique rings and amulets', { itemType: ['ring', 'amul'], rarity: 'unique' }, 'A', {}, 'unique', "The Stone of Jordan"),
         when('uniq-jewel', 'Unique jewels', { itemType: 'jewl', rarity: 'unique' }, 'A', {}, 'unique', 'Rainbow Facet'),
-        when('set-jewelry', 'Set rings and amulets', { itemType: ['ring', 'amul'], rarity: 'set' }, 'N', {}, 'set', "Tal Rasha's Adjudication"),
-        when('rare-jewelry', 'Rare and crafted rings and amulets', { itemType: ['ring', 'amul'], rarity: ['rare', 'crafted'] }, 'N', {}, 'rare', 'Rare Ring'),
+        when('set-jewelry', 'Set rings and amulets', { itemType: ['ring', 'amul'], rarity: 'set' }, 'N', { 4: 'B', 5: 'SHOW', 6: 'HIDE' }, 'set', "Tal Rasha's Adjudication"),
+        when('rare-ring', 'Rare rings', { itemType: 'ring', rarity: 'rare' }, 'N', { 4: 'B', 5: 'HIDE' }, 'rare', 'Rare Ring'),
+        when('rare-jewelry', 'Rare amulets and crafted rings and amulets', { itemType: ['ring', 'amul'], rarity: ['rare', 'crafted'] }, 'N', {}, 'rare', 'Rare Amulet'),
         when('rare-jewel', 'Rare and crafted jewels', { itemType: 'jewl', rarity: ['rare', 'crafted'] }, 'B', {}, 'rare', 'Rare Jewel'),
         when('rare-circlet', 'Rare and crafted circlets', { itemType: 'circ', rarity: ['rare', 'crafted'] }, 'B', {}, 'rare', 'Rare Diadem'),
         when('gc', 'Magic grand charms', { itemType: 'lcha', rarity: 'magic' }, 'N', {}, 'magic', 'Grand Charm'),
         when('sc', 'Magic small charms', { itemType: 'scha', rarity: 'magic' }, 'B', {}, 'magic', 'Small Charm'),
-        when('lc', 'Magic large charms', { itemType: 'mcha', rarity: 'magic' }, 'SHOW', { 3: 'HIDE' }, 'magic', 'Large Charm'),
+        when('lc', 'Magic large charms', { itemType: 'mcha', rarity: 'magic' }, 'SHOW', { 4: 'HIDE' }, 'magic', 'Large Charm'),
         when('magic-jewel', 'Magic jewels', { itemType: 'jewl', rarity: 'magic' }, 'SHOW', {}, 'magic', 'Jewel'),
-        when('magic-circlet', 'Magic circlets', { itemType: 'circ', rarity: 'magic' }, 'SHOW', { 3: 'HIDE' }, 'magic', 'Circlet'),
-        when('magic-jewelry', 'Magic rings and amulets', { itemType: ['ring', 'amul'], rarity: 'magic' }, 'SHOW', { 2: 'HIDE' }, 'magic', 'Amulet'),
+        when('magic-circlet', 'Magic circlets', { itemType: 'circ', rarity: 'magic' }, 'SHOW', { 5: 'HIDE' }, 'magic', 'Circlet'),
+        when('magic-ring', 'Magic rings', { itemType: 'ring', rarity: 'magic' }, 'SHOW', { 1: 'HIDE' }, 'magic', 'Ring'),
+        when('magic-jewelry', 'Magic amulets', { itemType: 'amul', rarity: 'magic' }, 'SHOW', { 3: 'HIDE' }, 'magic', 'Amulet'),
       ],
     },
     {
-      id: 'uniques', label: 'Uniques & sets', blurb: 'Equipment by base tier. A filter cannot tell two uniques on the same base apart.',
+      id: 'uniques', label: 'Uniques & sets', blurb: 'Equipment by the value of the best item on its base. A filter cannot tell two uniques on the same base apart.',
       groups: [
-        when('u-elite', 'Elite uniques', { rarity: 'unique', tier: 'elite' }, 'A', {}, 'unique', sample(data.uniques, 'elite')),
-        when('u-exc', 'Exceptional uniques', { rarity: 'unique', tier: 'exceptional' }, 'N', {}, 'unique', sample(data.uniques, 'exceptional')),
-        when('u-norm', 'Normal uniques', { rarity: 'unique', tier: 'normal' }, 'B', { 2: 'SHOW' }, 'unique', sample(data.uniques, 'normal')),
+        // First match wins: two stars and up, then every other elite unique, then the lower ratings.
+        rated('u-4', 'Four-star uniques', UNIQUE_STARS['4'], 'unique', 'S'),
+        rated('u-3', 'Three-star uniques', UNIQUE_STARS['3'], 'unique', 'A'),
+        rated('u-2', 'Two-star uniques', UNIQUE_STARS['2'], 'unique', 'N', { 4: 'B', 5: 'HIDE' }),
+        when('u-elite', 'Other elite uniques', { rarity: 'unique', tier: 'elite' }, 'B', { 4: 'HIDE' }, 'unique', sample(data.uniques, 'elite')),
+        rated('u-1', 'One-star uniques', UNIQUE_STARS['1'], 'unique', 'B', { 4: 'HIDE' }),
+        rated('u-0', 'Zero-star uniques', UNIQUE_STARS['0'], 'unique', 'B', { 4: 'HIDE' }),
+        rated('u-none', 'Below zero-star uniques', UNIQUE_STARS.none, 'unique', 'SHOW', { 3: 'HIDE' }),
+        rated('u-unrated', 'Unrated uniques', UNIQUE_STARS.unrated, 'unique', 'SHOW', { 2: 'HIDE' }),
         when('u-other', 'Other uniques', { rarity: 'unique' }, 'B', {}, 'unique', 'Unique item'),
-        when('s-elite', 'Elite set items', { rarity: 'set', tier: 'elite' }, 'N', {}, 'set', sample(data.sets, 'elite')),
-        when('s-exc', 'Exceptional set items', { rarity: 'set', tier: 'exceptional' }, 'SHOW', {}, 'set', sample(data.sets, 'exceptional')),
-        when('s-norm', 'Normal set items', { rarity: 'set', tier: 'normal' }, 'SHOW', { 4: 'HIDE' }, 'set', sample(data.sets, 'normal')),
+        rated('s-4', 'Four-star set items', SET_STARS['4'], 'set', 'A'),
+        rated('s-3', 'Three-star set items', SET_STARS['3'], 'set', 'N'),
+        rated('s-2', 'Two-star set items', SET_STARS['2'], 'set', 'B', { 4: 'SHOW', 5: 'HIDE' }),
+        rated('s-1', 'One-star set items', SET_STARS['1'], 'set', 'SHOW', { 4: 'HIDE' }),
+        rated('s-0', 'Zero-star set items', SET_STARS['0'], 'set', 'SHOW', { 4: 'HIDE' }),
+        rated('s-unrated', 'Unrated set items', SET_STARS.unrated, 'set', 'SHOW', { 2: 'HIDE' }),
         when('s-other', 'Other set items', { rarity: 'set' }, 'SHOW', {}, 'set', 'Set item'),
       ],
     },
@@ -167,31 +220,31 @@ export function buildCatalog(data) {
         base('rw-pb', 'Phase Blades', ['7cr', '7cr2'], 5, 'A'),
         base('rw-zerk', 'Berserker Axes', ['7wa'], 5, 'A'),
         base('rw-monarch', 'Monarch, Aegis and Ward', ['uit', 'uow', 'uts'], 4, 'A'),
-        family('rw-pala', 'Paladin shields', ['ashd'], 4, 'A'),
-        family('rw-pole', 'Elite polearms and scythes', ['pole', 'sc9'], 4, 'A'),
+        family('rw-pala', 'Paladin shields', ['ashd'], 4, 'A', { 2: 'N', 4: 'B', 6: 'HIDE' }),
+        family('rw-pole', 'Elite polearms and scythes', ['pole', 'sc9'], 4, 'A', { 5: 'N', 6: 'B' }),
         base('rw-diadem', 'Diadems and tiaras', ['ci3', 'ci2'], 2, 'A'),
-        family('rw-helm', 'Elite helms', ['helm'], 2, 'N'),
-        family('rw-tors', 'Other elite body armours', ['tors'], 3, 'N'),
-        family('rw-shield', 'Other elite shields', ['shie'], 2, 'N'),
-        family('rw-class', 'Elite class items: orbs, heads, pelts, barbarian helms, grimoires', ['orb', 'head', 'pelt', 'phlm', 'grim'], 2, 'N'),
-        family('rw-sword', 'Elite swords', ['swor', '2hcs'], 4, 'N'),
-        family('rw-axe', 'Elite axes', ['axe'], 4, 'N'),
-        family('rw-bow', 'Elite bows and crossbows', ['bow', 'xbow', 'abow'], 4, 'N'),
-        family('rw-spear', 'Elite spears', ['spea', 'aspe'], 4, 'N'),
-        family('rw-blunt', 'Elite maces, hammers and clubs', ['mace', 'hamm', 'club'], 3, 'N'),
-        family('rw-caster', 'Elite staves, wands and scepters', ['staf', 'wand', 'scep'], 2, 'N'),
-        family('rw-claw', 'Elite claws', ['h2h2'], 3, 'N'),
-        family('rw-small', 'Elite daggers, javelins and throwing weapons', ['knif', 'tkni', 'taxe', 'jave', 'ajav'], 2, 'B'),
+        family('rw-helm', 'Elite helms', ['helm'], 2, 'N', { 4: 'B', 6: 'HIDE' }),
+        family('rw-tors', 'Other elite body armours', ['tors'], 3, 'N', { 4: 'HIDE' }),
+        family('rw-shield', 'Other elite shields', ['shie'], 2, 'N', { 4: 'HIDE' }),
+        family('rw-class', 'Elite class items: orbs, heads, pelts, barbarian helms, grimoires', ['orb', 'head', 'pelt', 'phlm', 'grim'], 2, 'N', { 2: 'B', 4: 'HIDE' }),
+        family('rw-sword', 'Elite swords', ['swor', '2hcs'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-axe', 'Elite axes', ['axe'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-bow', 'Elite bows and crossbows', ['bow', 'xbow', 'abow'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-spear', 'Elite spears', ['spea', 'aspe'], 4, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-blunt', 'Elite maces, hammers and clubs', ['mace', 'hamm', 'club'], 3, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-caster', 'Elite staves, wands and scepters', ['staf', 'wand', 'scep'], 2, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-claw', 'Elite claws', ['h2h2'], 3, 'N', { 3: 'B', 4: 'HIDE' }),
+        family('rw-small', 'Elite daggers, javelins and throwing weapons', ['knif', 'tkni', 'taxe', 'jave', 'ajav'], 2, 'B', { 2: 'SHOW', 3: 'HIDE' }),
         when('craft-magic', 'Magic elite gloves, belts and boots', { itemType: ['glov', 'belt', 'boot'], rarity: 'magic', tier: 'elite' }, 'N', {}, 'magic', 'Vampirebone Gloves'),
       ],
     },
     {
       id: 'bases', label: 'White bases', blurb: 'Normal and superior gear for runewords and crafting.',
       groups: [
-        when('eth-elite', 'Ethereal elite bases', { rarity: ['normal', 'superior'], tier: 'elite', ethereal: true }, 'A', {}, 'gray', 'Ethereal Thresher'),
-        when('sock-elite', 'Socketed elite bases', { rarity: ['normal', 'superior'], tier: 'elite', sockets: { gte: 1 } }, 'N', {}, 'gray', 'Monarch [4]'),
-        when('sup-elite', 'Superior elite bases', { rarity: 'superior', tier: 'elite' }, 'SHOW', { 4: 'HIDE' }, 'normal', 'Superior Archon Plate'),
-        when('elite', 'Plain elite bases', { rarity: 'normal', tier: 'elite' }, 'SHOW', { 3: 'HIDE' }, 'normal', 'Archon Plate'),
+        when('eth-elite', 'Ethereal elite bases', { rarity: ['normal', 'superior'], tier: 'elite', ethereal: true }, 'A', { 4: 'N', 6: 'B' }, 'gray', 'Ethereal Thresher'),
+        when('sock-elite', 'Socketed elite bases', { rarity: ['normal', 'superior'], tier: 'elite', sockets: { gte: 1 } }, 'N', { 3: 'B', 4: 'SHOW', 5: 'HIDE' }, 'gray', 'Monarch [4]'),
+        when('sup-elite', 'Superior elite bases', { rarity: 'superior', tier: 'elite' }, 'SHOW', { 5: 'HIDE' }, 'normal', 'Superior Archon Plate'),
+        when('elite', 'Plain elite bases', { rarity: 'normal', tier: 'elite' }, 'SHOW', { 4: 'HIDE' }, 'normal', 'Archon Plate'),
         when('eth-exc', 'Ethereal exceptional bases', { rarity: ['normal', 'superior'], tier: 'exceptional', ethereal: true }, 'SHOW', { 4: 'HIDE' }, 'gray', 'Ethereal Cryptic Axe'),
         when('sock-exc', 'Socketed exceptional bases', { rarity: ['normal', 'superior'], tier: 'exceptional', sockets: { gte: 1 } }, 'SHOW', { 3: 'HIDE' }, 'gray', 'Crystal Sword [4]'),
         when('exc', 'Plain exceptional bases', { rarity: ['normal', 'superior'], tier: 'exceptional' }, 'SHOW', { 2: 'HIDE' }, 'normal', 'Sharkskin Gloves'),
@@ -204,9 +257,9 @@ export function buildCatalog(data) {
       id: 'magic', label: 'Rare, crafted & magic gear', blurb: 'Weapons and armour with affixes.',
       groups: [
         when('crafted', 'Crafted gear', { rarity: 'crafted' }, 'N', {}, 'crafted', 'Crafted Gloves'),
-        when('r-elite', 'Rare elite gear', { rarity: 'rare', tier: 'elite' }, 'SHOW', {}, 'rare', 'Rare Elite Helm'),
-        when('r-exc', 'Rare exceptional gear', { rarity: 'rare', tier: 'exceptional' }, 'SHOW', { 4: 'HIDE' }, 'rare', 'Rare Exceptional Boots'),
-        when('r-norm', 'Rare normal gear', { rarity: 'rare', tier: 'normal' }, 'SHOW', { 3: 'HIDE' }, 'rare', 'Rare Gloves'),
+        when('r-elite', 'Rare elite gear', { rarity: 'rare', tier: 'elite' }, 'SHOW', { 6: 'HIDE' }, 'rare', 'Rare Elite Helm'),
+        when('r-exc', 'Rare exceptional gear', { rarity: 'rare', tier: 'exceptional' }, 'SHOW', { 3: 'HIDE' }, 'rare', 'Rare Exceptional Boots'),
+        when('r-norm', 'Rare normal gear', { rarity: 'rare', tier: 'normal' }, 'SHOW', { 2: 'HIDE' }, 'rare', 'Rare Gloves'),
         when('m-elite', 'Magic elite gear', { rarity: 'magic', tier: 'elite' }, 'SHOW', { 3: 'HIDE' }, 'magic', 'Magic Monarch'),
         when('m-exc', 'Magic exceptional gear', { rarity: 'magic', tier: 'exceptional' }, 'SHOW', { 2: 'HIDE' }, 'magic', 'Magic Grim Shield'),
         when('m-norm', 'Magic normal gear', { rarity: 'magic', tier: 'normal' }, 'SHOW', { 1: 'HIDE' }, 'magic', 'Magic Buckler'),
@@ -217,13 +270,13 @@ export function buildCatalog(data) {
       groups: [
         codes('rvl', name('rvl'), ['rvl'], 'SHOW', {}, 'potion-r'),
         codes('rvs', name('rvs'), ['rvs'], 'SHOW', { 4: 'HIDE' }, 'potion-r'),
-        codes('pot5', 'Super healing and mana potions', ['hp5', 'mp5'], 'SHOW', { 3: 'HIDE' }, 'potion-h'),
-        codes('pot4', 'Greater healing and mana potions', ['hp4', 'mp4'], 'SHOW', { 2: 'HIDE' }, 'potion-h'),
+        codes('pot5', 'Super healing and mana potions', ['hp5', 'mp5'], 'SHOW', {}, 'potion-h'),
+        codes('pot4', 'Greater healing and mana potions', ['hp4', 'mp4'], 'SHOW', { 1: 'HIDE' }, 'potion-h'),
         codes('pot-low', 'Minor, light and plain healing and mana potions', ['hp1', 'hp2', 'hp3', 'mp1', 'mp2', 'mp3'], 'SHOW', { 1: 'HIDE' }, 'potion-h'),
         codes('pot-util', 'Stamina, antidote and thawing potions', ['vps', 'yps', 'wms'], 'SHOW', { 1: 'HIDE' }),
-        codes('scrolls', 'Town portal and identify scrolls', ['tsc', 'isc'], 'SHOW', { 2: 'HIDE' }),
-        codes('tomes', 'Tomes', ['tbk', 'ibk'], 'SHOW', { 2: 'HIDE' }),
-        codes('keys', 'Keys', ['key'], 'SHOW', { 2: 'HIDE' }),
+        codes('scrolls', 'Town portal and identify scrolls', ['tsc', 'isc'], 'SHOW', { 1: 'HIDE' }),
+        codes('tomes', 'Tomes', ['tbk', 'ibk'], 'SHOW', {}),
+        codes('keys', 'Keys', ['key'], 'SHOW', { 1: 'HIDE' }),
         codes('ammo', 'Arrows and bolts', ['aqv', 'aqv2', 'aqv3', 'cqv', 'cqv2', 'cqv3'], 'SHOW', { 1: 'HIDE' }),
         codes('gold', 'Gold', ['gld'], 'SHOW', {}, 'gold'),
       ],
