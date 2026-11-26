@@ -205,8 +205,10 @@ const kindStyles = kind => (kind ? effectiveStyles(state, kind) : styles);
 const groupStyles = group => { const k = kindsOf(group.when ?? alsoOf(group, state)); return kindStyles(k.length === 1 ? k[0] : ''); };
 // The styles an entry previews with: its tier look with the entry's own look on top.
 const entryStyles = (group, code) => {
-  const st = groupStyles(group), look = entryLook(state, group, code);
-  return look ? Object.fromEntries(Object.entries(st).map(([t, v]) => [t, merge(v, look)])) : st;
+  return Object.fromEntries(Object.entries(groupStyles(group)).map(([t, v]) => {
+    const look = entryLook(state, group, code, t);
+    return [t, look ? merge(v, look) : v];
+  }));
 };
 const entryOf = key => { const [kind, id] = key.split(':'); return kind === 'item' ? { group: groupOfCode.get(id), code: id.split('@')[0] } : { group: groupsById.get(id), code: null }; };
 const storeId = (group, code) => (code ? itemKey(group, code) : group.id);

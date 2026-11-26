@@ -25,7 +25,7 @@ export const LEVELS = [
   },
   {
     name: 'Semi strict', tag: 'Moderate', gold: 1000, who: 'Settled into Hell, still gearing up.',
-    text: 'Also hides magic exceptional gear, rare normal-tier gear, plain exceptional and socketed normal-tier bases, and uniques and set items with no value rating.',
+    text: 'Also hides magic exceptional gear, rare normal-tier gear, plain exceptional and socketed normal-tier bases, and unrated or unlisted uniques and set items (elite uniques still show).',
   },
   {
     name: 'Strict', tag: 'Medium', gold: 5000, who: 'Hell difficulty and early maps, once your gear is mostly set.',
@@ -58,8 +58,8 @@ export function upgradeRows(raw, rows = {}) {
 
 // Value ratings by base code from HiimFilter's builderfilter/data/unique-set-tiers.json (market-based stars):
 // a base takes the best rating of any unique (or set item) on it, ethereal or not, as one Pyre row covers both.
-// shortcut: copied snapshot, re-copy when market values drift or the mod adds items; unlisted bases are never hidden below Very strict
-// (elite uniques) or at all (the rest), since they may be items Hiim does not know.
+// shortcut: copied snapshot, re-copy when market values drift or the mod adds items; unlisted bases hide from Semi strict (elite uniques
+// from Very strict), though some may be items Hiim does not know.
 const UNIQUE_STARS = {
   '4': '6lw 6ws 7b7 7b8 7bk 7bl 7cr 7gd 7gm 7gw 7p7 7s8 7sr 7wa 7wc 7wh 7ws 8ls 8ws 9ls aar am5 amd ame amf aqv3 ci3 drd dre obe pa9 pab pac paf uar uh9 uhc uhg uhm ulc umc umg urn usk utg utp uts uul uvg xh9 xhb xow xtb xtg xvb ztb',
   '3': '6bs 7gi 7lw 7pa 7tw 7xf 8mx 8rx 9gm 9la 9s8 bae ci2 cqv3 dr6 dra drc ned nef neg obf pae tbt tgl uap ulm umb ung uow upl urg urs ush uuc uui uvc xea xhm xhn xlb xlt xmb xsh zhb zlb zvb',
@@ -187,9 +187,9 @@ export function buildCatalog(data) {
         when('cs2', 'Sunder charms', { code: 'cs2' }, 'S', {}, 'unique', 'Grand Charm'),
         when('uniq-charm', 'Unique charms', { itemType: 'char', rarity: 'unique' }, 'S', {}, 'unique', 'Annihilus'),
         when('torch', 'Torches', { code: 'tch' }, 'S', {}, 'unique', 'Hellfire Torch'),
-        when('cjw', 'Colossal jewels', { code: 'cjw' }, 'A', {}, 'unique', 'Colossal Jewel'),
-        when('uniq-jewelry', 'Unique rings and amulets', { itemType: ['ring', 'amul'], rarity: 'unique' }, 'A', {}, 'unique', "The Stone of Jordan"),
-        when('uniq-jewel', 'Unique jewels', { itemType: 'jewl', rarity: 'unique' }, 'A', {}, 'unique', 'Rainbow Facet'),
+        when('cjw', 'Colossal jewels', { code: 'cjw' }, 'S', {}, 'unique', 'Colossal Jewel'),
+        when('uniq-jewelry', 'Unique rings and amulets', { itemType: ['ring', 'amul'], rarity: 'unique' }, 'S', {}, 'unique', "The Stone of Jordan"),
+        when('uniq-jewel', 'Unique jewels', { itemType: 'jewl', rarity: 'unique' }, 'S', {}, 'unique', 'Rainbow Facet'),
         when('set-jewelry', 'Set rings and amulets', { itemType: ['ring', 'amul'], rarity: 'set' }, 'N', { 4: 'B', 5: 'SHOW', 6: 'HIDE' }, 'set', "Tal Rasha's Adjudication"),
         when('rare-ring', 'Rare rings', { itemType: 'ring', rarity: 'rare' }, 'N', { 4: 'B', 5: 'HIDE' }, 'rare', 'Rare Ring'),
         when('rare-jewelry', 'Rare amulets and crafted rings and amulets', { itemType: ['ring', 'amul'], rarity: ['rare', 'crafted'] }, 'N', {}, 'rare', 'Rare Amulet'),
@@ -216,7 +216,7 @@ export function buildCatalog(data) {
         rated('u-0', 'Zero-star uniques', stars(UNIQUE_STARS['0'], belowElite), 'unique', 'B', { 4: 'HIDE' }),
         rated('u-none', 'Below zero-star uniques', stars(UNIQUE_STARS.none, belowElite), 'unique', 'SHOW', { 3: 'HIDE' }),
         rated('u-unrated', 'Unrated uniques', stars(UNIQUE_STARS.unrated, belowElite), 'unique', 'SHOW', { 2: 'HIDE' }),
-        rated('u-new', 'Unlisted uniques', rest(data.uniques, Object.values(UNIQUE_STARS), belowElite), 'unique', 'B', {}),
+        rated('u-new', 'Unlisted uniques', rest(data.uniques, Object.values(UNIQUE_STARS), belowElite), 'unique', 'B', { 2: 'HIDE' }),
         when('u-other', 'Any other unique', { rarity: 'unique' }, 'B', {}, 'unique', 'Unique item'),
         rated('s-4', 'Four-star set items', stars(SET_STARS['4']), 'set', 'A'),
         rated('s-3', 'Three-star set items', stars(SET_STARS['3']), 'set', 'N'),
@@ -224,7 +224,7 @@ export function buildCatalog(data) {
         rated('s-1', 'One-star set items', stars(SET_STARS['1']), 'set', 'SHOW', { 4: 'HIDE' }),
         rated('s-0', 'Zero-star set items', stars(SET_STARS['0']), 'set', 'SHOW', { 4: 'HIDE' }),
         rated('s-unrated', 'Unrated set items', stars(SET_STARS.unrated), 'set', 'SHOW', { 2: 'HIDE' }),
-        rated('s-new', 'Unlisted set items', rest(data.sets, Object.values(SET_STARS)), 'set', 'SHOW', {}),
+        rated('s-new', 'Unlisted set items', rest(data.sets, Object.values(SET_STARS)), 'set', 'SHOW', { 2: 'HIDE' }),
         when('s-other', 'Any other set item', { rarity: 'set' }, 'SHOW', {}, 'set', 'Set item'),
       ],
     },
@@ -298,7 +298,12 @@ export function buildCatalog(data) {
       ],
     },
   ];
-  for (const c of categories) c.groups = c.groups.filter(g => g.codes?.length !== 0);
+  // Currency and uber pieces below Chase share one drop sound, whatever tier a row is moved to.
+  const tierOwn = Object.fromEntries(['A', 'N', 'B'].map(t => [t, { sound: 'Filter02' }]));
+  for (const c of categories) {
+    c.groups = c.groups.filter(g => g.codes?.length !== 0);
+    if (['currency', 'ubers'].includes(c.id)) c.groups = c.groups.map(g => ({ ...g, tierOwn }));
+  }
   return categories;
 }
 

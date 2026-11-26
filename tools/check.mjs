@@ -173,6 +173,16 @@ assert.equal(sim(one, { code: 'uit', rarity: 'normal', sockets: 4 }).visible, tr
 assert.equal(sim(one, { code: 'uap', rarity: 'unique' }).rule.dropSound, 'Filter12');
 assert.equal(sim(one, { code: 'uap', rarity: 'normal', sockets: 2 }).rule.dropSound !== 'Filter12', true);
 
+for (const [level] of LEVELS.entries()) for (const code of ['u-new', 's-new'].map(id => catalog.flatMap(c => c.groups).find(g => g.id === id).codes[0])) {
+  const rarity = catalog.flatMap(c => c.groups).some(g => g.id === 'u-new' && g.codes.includes(code)) ? 'unique' : 'set';
+  assert.equal(at(level, code, rarity).visible, level < 2, `unlisted ${rarity} ${code} at level ${level}`);
+}
+assert.equal(at(1, 'r30').rule.dropSound, 'Filter06');
+assert.equal(at(1, 'lbox').rule.dropSound, 'Filter06', 'Chase currency keeps the Chase sound');
+for (const code of ['upma', 'crfb', 'tes', 'pk1', 'std']) assert.equal(at(6, code).rule.dropSound, 'Filter02', `${code} sound`);
+assert.equal(sim(compile(catalog, { ...base, level: 1, overrides: { dclone: 'B' } }), { code: 'dcma', rarity: 'normal' }).rule.dropSound, 'Filter02', 'the sound follows the tier a row is moved to');
+for (const [code, rarity] of [['rin', 'unique'], ['amu', 'unique'], ['jew', 'unique'], ['cjw', 'unique']]) assert.equal(at(6, code, rarity).rule.dropSound, 'Filter06', `unique ${code} is Chase`);
+
 // Preset looks keep the game's name colours: 2 stars border, 3 stars a darker box, 4 stars a pale box.
 const tt = (code, rarity) => at(1, code, rarity).rule.tooltip;
 assert.equal(tt('uit', 'unique').borderColor, 'RGBA(199, 179, 119, 1)');

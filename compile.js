@@ -55,8 +55,8 @@ export const merge = (base, edit = {}) => {
 
 // An entry's own look: the row's built-in one, the player's row edit, then the item's edit on top.
 // Only changed fields, so the rest follow the tier.
-export function entryLook(state, group, code) {
-  const layers = [group.own, state.rowLooks?.[group.id], code ? state.itemLooks?.[itemKey(group, code)] : null].filter(Boolean);
+export function entryLook(state, group, code, tier) {
+  const layers = [group.own, group.tierOwn?.[tier], state.rowLooks?.[group.id], code ? state.itemLooks?.[itemKey(group, code)] : null].filter(Boolean);
   if (!layers.length) return null;
   return layers.reduce((under, over) => {
     const out = { ...under, ...over };
@@ -193,7 +193,7 @@ export function compile(catalog, state) {
           // A level hiding a base row leaves ethereal ones to the White bases rows; the player's own Hide takes all.
           const preset = !(group.id in state.overrides) && !(itemKey(group, code) in (state.itemOverrides ?? {}));
           if (tier === 'HIDE' && preset && group.opts && also.ethereal === undefined) also = { ...also, ethereal: false };
-          const look = tier === 'HIDE' ? null : entryLook(state, group, code);
+          const look = tier === 'HIDE' ? null : entryLook(state, group, code, tier);
           const tint = tier === 'HIDE' ? undefined : group.look;
           const key = tier + JSON.stringify(also ?? {}) + JSON.stringify(look) + tint;
           if (!byTier.has(key)) byTier.set(key, { tier, also, look, tint, codes: [] });
@@ -201,7 +201,7 @@ export function compile(catalog, state) {
         }
       } else {
         flush(); // rows above a condition row stay above it
-        emit(rules, tierOf(group, state), `${category.label}: ${group.label}`, group.when, state, styles, entryLook(state, group), group.look);
+        emit(rules, tierOf(group, state), `${category.label}: ${group.label}`, group.when, state, styles, entryLook(state, group, undefined, tierOf(group, state)), group.look);
       }
     }
     flush();
